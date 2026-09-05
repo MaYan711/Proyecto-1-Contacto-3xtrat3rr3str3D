@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Aplicacion" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="com.compi2.contacto.Aplicacion" />
+    <module name="contacto-extraterrestre" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
+
