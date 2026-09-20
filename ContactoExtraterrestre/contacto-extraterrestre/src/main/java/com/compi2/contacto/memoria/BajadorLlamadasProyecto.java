@@ -16,6 +16,7 @@ public final class BajadorLlamadasProyecto {
     private MarcoStackProyecto marcoActual;
     private final List<ParametroPendiente> parametrosPendientes;
     private int siguienteTemporal;
+    private int siguienteTemporalObjeto;
 
     public BajadorLlamadasProyecto() {
         parametrosPendientes =
@@ -43,6 +44,7 @@ public final class BajadorLlamadasProyecto {
         marcoActual = null;
         parametrosPendientes.clear();
         siguienteTemporal = 0;
+        siguienteTemporalObjeto = 0;
 
         for (Cuarteta cuarteta
                 : origen.cuartetas()) {
@@ -260,12 +262,166 @@ public final class BajadorLlamadasProyecto {
                         cantidad
                 );
 
-        copiarParametrosSimbolicos(
-                parametros
+        String constructor =
+                cuarteta.argumento1();
+
+        String clase =
+                extraerClaseConstructor(
+                        constructor
+                );
+
+        Optional<MarcoStackProyecto> marcoConstructor =
+                plan.marco(
+                        constructor
+                );
+
+        Optional<LayoutHeapProyecto> layout =
+                clase == null
+                        ? Optional.empty()
+                        : plan.layout(
+                        "Z::" + clase
+                );
+
+        if (marcoActual == null
+                || marcoConstructor.isEmpty()
+                || layout.isEmpty()) {
+
+            copiarParametrosSimbolicos(
+                    parametros
+            );
+
+            copiar(
+                    cuarteta
+            );
+
+            return;
+        }
+
+        LayoutHeapProyecto layoutObjeto =
+                layout.orElseThrow();
+
+        String referenciaObjeto =
+                nuevoTemporalObjeto();
+
+        agregar(
+                OperadorCuarteta.ASIGNAR,
+                "H",
+                null,
+                referenciaObjeto
         );
 
-        copiar(
-                cuarteta
+        String nuevoHeap =
+                nuevoTemporalObjeto();
+
+        agregar(
+                OperadorCuarteta.SUMAR,
+                "H",
+                String.valueOf(
+                        layoutObjeto.tamano()
+                ),
+                nuevoHeap
+        );
+
+        agregar(
+                OperadorCuarteta.ASIGNAR,
+                nuevoHeap,
+                null,
+                "H"
+        );
+
+        int tamanoLlamador =
+                marcoActual.tamano();
+
+        agregar(
+                OperadorCuarteta.ESCRIBIR_STACK,
+                "P+"
+                        + (
+                        tamanoLlamador
+                                + 1
+                ),
+                referenciaObjeto,
+                null
+        );
+
+        for (int indiceLista = 0;
+             indiceLista < parametros.size();
+             indiceLista++) {
+
+            ParametroPendiente parametro =
+                    parametros.get(
+                            indiceLista
+                    );
+
+            int indiceParametro =
+                    entero(
+                            parametro.indice(),
+                            indiceLista
+                    );
+
+            int desplazamiento =
+                    tamanoLlamador
+                            + 2
+                            + indiceParametro;
+
+            agregar(
+                    OperadorCuarteta.ESCRIBIR_STACK,
+                    "P+" + desplazamiento,
+                    parametro.valor(),
+                    null
+            );
+        }
+
+        moverPAdelante(
+                tamanoLlamador
+        );
+
+        agregar(
+                OperadorCuarteta.LLAMAR,
+                constructor,
+                String.valueOf(
+                        cantidad + 1
+                ),
+                null
+        );
+
+        if (!esVacio(
+                cuarteta.resultado()
+        )) {
+
+            agregar(
+                    OperadorCuarteta.LEER_STACK,
+                    "P+0",
+                    null,
+                    cuarteta.resultado()
+            );
+        }
+
+        moverPAtras(
+                tamanoLlamador
+        );
+    }
+
+    private String extraerClaseConstructor(
+            String constructor
+    ) {
+        if (constructor == null
+                || constructor.isBlank()) {
+
+            return null;
+        }
+
+        int indice =
+                constructor.indexOf(
+                        ".<init>("
+                );
+
+        if (indice <= 0) {
+            return null;
+        }
+
+        return constructor.substring(
+                0,
+                indice
         );
     }
 
@@ -414,6 +570,11 @@ public final class BajadorLlamadasProyecto {
     private String nuevoTemporal() {
         return "call_t"
                 + siguienteTemporal++;
+    }
+
+    private String nuevoTemporalObjeto() {
+        return "obj_t"
+                + siguienteTemporalObjeto++;
     }
 
     private void copiar(
