@@ -21,6 +21,7 @@ import com.compi2.contacto.semantica.ResultadoSemanticoPig;
 import com.compi2.contacto.semantica.ResultadoSemanticoY;
 import com.compi2.contacto.semantica.ResultadoSemanticoZ;
 import com.compi2.contacto.semantica.TablaSimbolos;
+import com.compi2.contacto.memoria.BajadorLlamadasProyecto;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -188,6 +189,13 @@ public final class CompiladorProyecto {
                     new BajadorMemoriaProyecto()
                             .bajar(
                                     intermedio,
+                                    planMemoria
+                            );
+
+            programaMemoria =
+                    new BajadorLlamadasProyecto()
+                            .bajar(
+                                    programaMemoria,
                                     planMemoria
                             );
         }
