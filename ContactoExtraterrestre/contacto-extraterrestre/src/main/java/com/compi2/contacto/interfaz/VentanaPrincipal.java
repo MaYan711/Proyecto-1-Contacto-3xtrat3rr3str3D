@@ -50,23 +50,54 @@ public final class VentanaPrincipal extends JFrame {
     private final CompiladorProyecto compilador;
     private final JTree arbolProyecto;
     private final JTabbedPane pestanas;
+    private final JTabbedPane pestanasResultados;
     private final ModeloTablaDiagnosticos modeloDiagnosticos;
+    private final PanelCuartetas panelCuartetas;
+    private final PanelCuartetas panelMemoria;
     private final JLabel estado;
     private Path raizProyecto;
 
     public VentanaPrincipal() {
         super("Contacto 3xtrat3rr3str3D");
 
-        gestorProyecto = new GestorProyecto();
-        compilador = new CompiladorProyecto();
-        pestanas = new JTabbedPane();
-        modeloDiagnosticos = new ModeloTablaDiagnosticos();
-        estado = new JLabel("Abra una carpeta de proyecto para comenzar");
+        gestorProyecto =
+                new GestorProyecto();
 
-        DefaultMutableTreeNode raizInicial = new DefaultMutableTreeNode(
-                "Sin proyecto"
-        );
-        arbolProyecto = new JTree(new DefaultTreeModel(raizInicial));
+        compilador =
+                new CompiladorProyecto();
+
+        pestanas =
+                new JTabbedPane();
+
+        pestanasResultados =
+                new JTabbedPane();
+
+        modeloDiagnosticos =
+                new ModeloTablaDiagnosticos();
+
+        panelCuartetas =
+                new PanelCuartetas();
+
+        panelMemoria =
+                new PanelCuartetas();
+
+
+        estado =
+                new JLabel(
+                        "Abra una carpeta de proyecto para comenzar"
+                );
+
+        DefaultMutableTreeNode raizInicial =
+                new DefaultMutableTreeNode(
+                        "Sin proyecto"
+                );
+
+        arbolProyecto =
+                new JTree(
+                        new DefaultTreeModel(
+                                raizInicial
+                        )
+                );
 
         configurarVentana();
         construirInterfaz();
@@ -74,236 +105,639 @@ public final class VentanaPrincipal extends JFrame {
     }
 
     private void configurarVentana() {
-        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-        setMinimumSize(new Dimension(1050, 700));
-        setSize(1280, 820);
-        setLocationRelativeTo(null);
-        setJMenuBar(crearMenu());
+        setDefaultCloseOperation(
+                WindowConstants.DO_NOTHING_ON_CLOSE
+        );
+
+        setMinimumSize(
+                new Dimension(
+                        1050,
+                        700
+                )
+        );
+
+        setSize(
+                1280,
+                820
+        );
+
+        setLocationRelativeTo(
+                null
+        );
+
+        setJMenuBar(
+                crearMenu()
+        );
     }
 
     private void construirInterfaz() {
-        JPanel contenido = new JPanel(new BorderLayout());
-        contenido.setBackground(new Color(243, 244, 246));
+        JPanel contenido =
+                new JPanel(
+                        new BorderLayout()
+                );
 
-        arbolProyecto.setRootVisible(true);
-        arbolProyecto.setShowsRootHandles(true);
-        arbolProyecto.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        arbolProyecto.setCellRenderer(new RenderizadorArbolProyecto());
-
-        JScrollPane panelArbol = new JScrollPane(arbolProyecto);
-        panelArbol.setPreferredSize(new Dimension(260, 500));
-        panelArbol.setBorder(BorderFactory.createTitledBorder("Proyecto"));
-
-        JTable tablaDiagnosticos = new JTable(modeloDiagnosticos);
-        tablaDiagnosticos.setFillsViewportHeight(true);
-        tablaDiagnosticos.setAutoCreateRowSorter(true);
-        tablaDiagnosticos.setRowHeight(24);
-        tablaDiagnosticos.getColumnModel().getColumn(5)
-                .setPreferredWidth(600);
-
-        JScrollPane panelDiagnosticos = new JScrollPane(tablaDiagnosticos);
-        panelDiagnosticos.setBorder(
-                BorderFactory.createTitledBorder("Diagnosticos")
+        contenido.setBackground(
+                new Color(
+                        243,
+                        244,
+                        246
+                )
         );
 
-        JSplitPane centroVertical = new JSplitPane(
-                JSplitPane.VERTICAL_SPLIT,
-                pestanas,
+        arbolProyecto.setRootVisible(
+                true
+        );
+
+        arbolProyecto.setShowsRootHandles(
+                true
+        );
+
+        arbolProyecto.setFont(
+                new Font(
+                        "SansSerif",
+                        Font.PLAIN,
+                        14
+                )
+        );
+
+        arbolProyecto.setCellRenderer(
+                new RenderizadorArbolProyecto()
+        );
+
+        JScrollPane panelArbol =
+                new JScrollPane(
+                        arbolProyecto
+                );
+
+        panelArbol.setPreferredSize(
+                new Dimension(
+                        260,
+                        500
+                )
+        );
+
+        panelArbol.setBorder(
+                BorderFactory.createTitledBorder(
+                        "Proyecto"
+                )
+        );
+
+        JTable tablaDiagnosticos =
+                new JTable(
+                        modeloDiagnosticos
+                );
+
+        tablaDiagnosticos.setFillsViewportHeight(
+                true
+        );
+
+        tablaDiagnosticos.setAutoCreateRowSorter(
+                true
+        );
+
+        tablaDiagnosticos.setRowHeight(
+                24
+        );
+
+        tablaDiagnosticos.getColumnModel()
+                .getColumn(5)
+                .setPreferredWidth(
+                        600
+                );
+
+        JScrollPane panelDiagnosticos =
+                new JScrollPane(
+                        tablaDiagnosticos
+                );
+
+        panelDiagnosticos.setBorder(
+                BorderFactory.createEmptyBorder()
+        );
+
+        pestanasResultados.addTab(
+                "Diagnosticos",
                 panelDiagnosticos
         );
-        centroVertical.setResizeWeight(0.75);
 
-        JSplitPane principal = new JSplitPane(
-                JSplitPane.HORIZONTAL_SPLIT,
-                panelArbol,
-                centroVertical
+        pestanasResultados.addTab(
+                "Cuartetas",
+                panelCuartetas
         );
-        principal.setDividerLocation(270);
 
-        estado.setBorder(BorderFactory.createEmptyBorder(6, 10, 6, 10));
-        estado.setHorizontalAlignment(SwingConstants.LEFT);
+        pestanasResultados.addTab(
+                "Memoria / C3D",
+                panelMemoria
+        );
 
-        contenido.add(principal, BorderLayout.CENTER);
-        contenido.add(estado, BorderLayout.SOUTH);
-        setContentPane(contenido);
+        JSplitPane centroVertical =
+                new JSplitPane(
+                        JSplitPane.VERTICAL_SPLIT,
+                        pestanas,
+                        pestanasResultados
+                );
+
+        centroVertical.setResizeWeight(
+                0.72
+        );
+
+        centroVertical.setDividerLocation(
+                520
+        );
+
+        JSplitPane principal =
+                new JSplitPane(
+                        JSplitPane.HORIZONTAL_SPLIT,
+                        panelArbol,
+                        centroVertical
+                );
+
+        principal.setDividerLocation(
+                270
+        );
+
+        estado.setBorder(
+                BorderFactory.createEmptyBorder(
+                        6,
+                        10,
+                        6,
+                        10
+                )
+        );
+
+        estado.setHorizontalAlignment(
+                SwingConstants.LEFT
+        );
+
+        contenido.add(
+                principal,
+                BorderLayout.CENTER
+        );
+
+        contenido.add(
+                estado,
+                BorderLayout.SOUTH
+        );
+
+        setContentPane(
+                contenido
+        );
     }
 
     private JMenuBar crearMenu() {
-        JMenuBar barra = new JMenuBar();
+        JMenuBar barra =
+                new JMenuBar();
 
-        JMenu archivo = new JMenu("Archivo");
-        JMenuItem abrir = new JMenuItem("Abrir proyecto...");
-        abrir.setAccelerator(KeyStroke.getKeyStroke(
-                KeyEvent.VK_O,
-                InputEvent.CTRL_DOWN_MASK
-        ));
-        abrir.addActionListener(evento -> seleccionarProyecto());
+        JMenu archivo =
+                new JMenu(
+                        "Archivo"
+                );
 
-        JMenuItem guardar = new JMenuItem("Guardar archivo");
-        guardar.setAccelerator(KeyStroke.getKeyStroke(
-                KeyEvent.VK_S,
-                InputEvent.CTRL_DOWN_MASK
-        ));
-        guardar.addActionListener(evento -> guardarActivo());
+        JMenuItem abrir =
+                new JMenuItem(
+                        "Abrir proyecto..."
+                );
 
-        JMenuItem salir = new JMenuItem("Salir");
-        salir.addActionListener(evento -> intentarCerrar());
+        abrir.setAccelerator(
+                KeyStroke.getKeyStroke(
+                        KeyEvent.VK_O,
+                        InputEvent.CTRL_DOWN_MASK
+                )
+        );
 
-        archivo.add(abrir);
-        archivo.add(guardar);
+        abrir.addActionListener(
+                evento ->
+                        seleccionarProyecto()
+        );
+
+        JMenuItem guardar =
+                new JMenuItem(
+                        "Guardar archivo"
+                );
+
+        guardar.setAccelerator(
+                KeyStroke.getKeyStroke(
+                        KeyEvent.VK_S,
+                        InputEvent.CTRL_DOWN_MASK
+                )
+        );
+
+        guardar.addActionListener(
+                evento ->
+                        guardarActivo()
+        );
+
+        JMenuItem salir =
+                new JMenuItem(
+                        "Salir"
+                );
+
+        salir.addActionListener(
+                evento ->
+                        intentarCerrar()
+        );
+
+        archivo.add(
+                abrir
+        );
+
+        archivo.add(
+                guardar
+        );
+
         archivo.addSeparator();
-        archivo.add(salir);
 
-        JMenu compilacion = new JMenu("Compilacion");
-        JMenuItem analizar = new JMenuItem("Analizar proyecto");
-        analizar.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F6, 0));
-        analizar.addActionListener(evento -> analizarProyecto());
-        compilacion.add(analizar);
+        archivo.add(
+                salir
+        );
 
-        barra.add(archivo);
-        barra.add(compilacion);
+        JMenu compilacion =
+                new JMenu(
+                        "Compilacion"
+                );
+
+        JMenuItem analizar =
+                new JMenuItem(
+                        "Analizar proyecto"
+                );
+
+        analizar.setAccelerator(
+                KeyStroke.getKeyStroke(
+                        KeyEvent.VK_F6,
+                        0
+                )
+        );
+
+        analizar.addActionListener(
+                evento ->
+                        analizarProyecto()
+        );
+
+        compilacion.add(
+                analizar
+        );
+
+        barra.add(
+                archivo
+        );
+
+        barra.add(
+                compilacion
+        );
+
         return barra;
     }
 
     private void configurarEventos() {
-        arbolProyecto.addTreeSelectionListener(this::seleccionArbol);
+        arbolProyecto.addTreeSelectionListener(
+                this::seleccionArbol
+        );
 
-        addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent evento) {
-                intentarCerrar();
-            }
-        });
+        addWindowListener(
+                new WindowAdapter() {
+
+                    @Override
+                    public void windowClosing(
+                            WindowEvent evento
+                    ) {
+                        intentarCerrar();
+                    }
+                }
+        );
     }
 
     private void seleccionarProyecto() {
-        JFileChooser selector = new JFileChooser();
-        selector.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        selector.setDialogTitle("Seleccionar carpeta del proyecto");
+        JFileChooser selector =
+                new JFileChooser();
 
-        if (selector.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            abrirProyecto(selector.getSelectedFile().toPath());
+        selector.setFileSelectionMode(
+                JFileChooser.DIRECTORIES_ONLY
+        );
+
+        selector.setDialogTitle(
+                "Seleccionar carpeta del proyecto"
+        );
+
+        if (selector.showOpenDialog(this)
+                == JFileChooser.APPROVE_OPTION) {
+
+            abrirProyecto(
+                    selector.getSelectedFile()
+                            .toPath()
+            );
         }
     }
 
-    private void abrirProyecto(Path raiz) {
+    private void abrirProyecto(
+            Path raiz
+    ) {
         try {
-            raizProyecto = raiz.toAbsolutePath().normalize();
-            DefaultMutableTreeNode nodoRaiz = crearNodo(raizProyecto);
-            arbolProyecto.setModel(new DefaultTreeModel(nodoRaiz));
+            raizProyecto =
+                    raiz.toAbsolutePath()
+                            .normalize();
+
+            DefaultMutableTreeNode nodoRaiz =
+                    crearNodo(
+                            raizProyecto
+                    );
+
+            arbolProyecto.setModel(
+                    new DefaultTreeModel(
+                            nodoRaiz
+                    )
+            );
+
             pestanas.removeAll();
-            modeloDiagnosticos.actualizar(List.of());
-            estado.setText("Proyecto abierto: " + raizProyecto);
+
+            modeloDiagnosticos.actualizar(
+                    List.of()
+            );
+
+            panelCuartetas.limpiar();
+
+            panelMemoria.limpiar();
+
+            actualizarTitulosResultados();
+
+            pestanasResultados.setSelectedIndex(
+                    0
+            );
+
+            estado.setText(
+                    "Proyecto abierto: "
+                            + raizProyecto
+            );
+
         } catch (IOException excepcion) {
-            mostrarError("No se pudo abrir el proyecto", excepcion);
+
+            mostrarError(
+                    "No se pudo abrir el proyecto",
+                    excepcion
+            );
         }
     }
 
-    private DefaultMutableTreeNode crearNodo(Path ruta) throws IOException {
-        DefaultMutableTreeNode nodo = new DefaultMutableTreeNode(ruta);
+    private DefaultMutableTreeNode crearNodo(
+            Path ruta
+    ) throws IOException {
 
-        if (!Files.isDirectory(ruta)) {
+        DefaultMutableTreeNode nodo =
+                new DefaultMutableTreeNode(
+                        ruta
+                );
+
+        if (!Files.isDirectory(
+                ruta
+        )) {
             return nodo;
         }
 
         List<Path> hijos;
-        try (var flujo = Files.list(ruta)) {
-            hijos = flujo
-                    .filter(this::mostrarEnArbol)
-                    .sorted(Comparator
-                            .comparing((Path path) -> !Files.isDirectory(path))
-                            .thenComparing(path -> path.getFileName().toString()))
-                    .toList();
+
+        try (var flujo =
+                     Files.list(
+                             ruta
+                     )) {
+
+            hijos =
+                    flujo
+                            .filter(
+                                    this::mostrarEnArbol
+                            )
+                            .sorted(
+                                    Comparator
+                                            .comparing(
+                                                    (Path path) ->
+                                                            !Files.isDirectory(
+                                                                    path
+                                                            )
+                                            )
+                                            .thenComparing(
+                                                    path ->
+                                                            path.getFileName()
+                                                                    .toString()
+                                            )
+                            )
+                            .toList();
         }
 
         for (Path hijo : hijos) {
-            nodo.add(crearNodo(hijo));
+            nodo.add(
+                    crearNodo(
+                            hijo
+                    )
+            );
         }
 
         return nodo;
     }
 
-    private boolean mostrarEnArbol(Path ruta) {
-        if (Files.isDirectory(ruta)) {
-            String nombre = ruta.getFileName().toString();
-            return !nombre.equals("target")
-                    && !nombre.equals(".idea")
-                    && !nombre.equals(".git");
+    private boolean mostrarEnArbol(
+            Path ruta
+    ) {
+        if (Files.isDirectory(
+                ruta
+        )) {
+
+            String nombre =
+                    ruta.getFileName()
+                            .toString();
+
+            return !nombre.equals(
+                    "target"
+            )
+                    && !nombre.equals(
+                    ".idea"
+            )
+                    && !nombre.equals(
+                    ".git"
+            );
         }
-        return LenguajeFuente.desdeRuta(ruta).isPresent();
+
+        return LenguajeFuente.desdeRuta(
+                ruta
+        ).isPresent();
     }
 
-    private void seleccionArbol(TreeSelectionEvent evento) {
-        Object seleccionado = arbolProyecto.getLastSelectedPathComponent();
-        if (!(seleccionado instanceof DefaultMutableTreeNode nodo)) {
+    private void seleccionArbol(
+            TreeSelectionEvent evento
+    ) {
+        Object seleccionado =
+                arbolProyecto
+                        .getLastSelectedPathComponent();
+
+        if (!(seleccionado
+                instanceof DefaultMutableTreeNode nodo)) {
+
             return;
         }
-        if (!(nodo.getUserObject() instanceof Path ruta)) {
+
+        if (!(nodo.getUserObject()
+                instanceof Path ruta)) {
+
             return;
         }
-        if (Files.isRegularFile(ruta)) {
-            abrirArchivo(ruta);
+
+        if (Files.isRegularFile(
+                ruta
+        )) {
+            abrirArchivo(
+                    ruta
+            );
         }
     }
 
-    private void abrirArchivo(Path ruta) {
-        for (int indice = 0; indice < pestanas.getTabCount(); indice++) {
-            PanelEditor panel = (PanelEditor) pestanas.getComponentAt(indice);
-            if (panel.editor().ruta().equals(ruta)) {
-                pestanas.setSelectedIndex(indice);
+    private void abrirArchivo(
+            Path ruta
+    ) {
+        for (int indice = 0;
+             indice < pestanas.getTabCount();
+             indice++) {
+
+            PanelEditor panel =
+                    (PanelEditor)
+                            pestanas.getComponentAt(
+                                    indice
+                            );
+
+            if (panel.editor()
+                    .ruta()
+                    .equals(
+                            ruta
+                    )) {
+
+                pestanas.setSelectedIndex(
+                        indice
+                );
+
                 return;
             }
         }
 
         try {
-            LenguajeFuente lenguaje = LenguajeFuente.desdeRuta(ruta)
-                    .orElseThrow();
-            ArchivoFuente archivo = new ArchivoFuente(
-                    ruta,
-                    lenguaje,
-                    Files.readString(ruta, StandardCharsets.UTF_8)
+            LenguajeFuente lenguaje =
+                    LenguajeFuente.desdeRuta(
+                            ruta
+                    ).orElseThrow();
+
+            ArchivoFuente archivo =
+                    new ArchivoFuente(
+                            ruta,
+                            lenguaje,
+                            Files.readString(
+                                    ruta,
+                                    StandardCharsets.UTF_8
+                            )
+                    );
+
+            PanelEditor panel =
+                    new PanelEditor(
+                            archivo
+                    );
+
+            pestanas.addTab(
+                    archivo.nombre(),
+                    panel
             );
-            PanelEditor panel = new PanelEditor(archivo);
-            pestanas.addTab(archivo.nombre(), panel);
-            pestanas.setSelectedComponent(panel);
+
+            pestanas.setSelectedComponent(
+                    panel
+            );
+
         } catch (IOException excepcion) {
-            mostrarError("No se pudo abrir el archivo", excepcion);
+
+            mostrarError(
+                    "No se pudo abrir el archivo",
+                    excepcion
+            );
         }
     }
 
     private void guardarActivo() {
-        if (!(pestanas.getSelectedComponent() instanceof PanelEditor panel)) {
+        if (!(pestanas.getSelectedComponent()
+                instanceof PanelEditor panel)) {
+
             return;
         }
 
-        guardar(panel.editor());
+        guardar(
+                panel.editor()
+        );
     }
 
     private void guardarTodos() {
-        for (int indice = 0; indice < pestanas.getTabCount(); indice++) {
-            PanelEditor panel = (PanelEditor) pestanas.getComponentAt(indice);
-            if (panel.editor().modificado()) {
-                guardar(panel.editor());
+        for (int indice = 0;
+             indice < pestanas.getTabCount();
+             indice++) {
+
+            PanelEditor panel =
+                    (PanelEditor)
+                            pestanas.getComponentAt(
+                                    indice
+                            );
+
+            if (panel.editor()
+                    .modificado()) {
+
+                guardar(
+                        panel.editor()
+                );
             }
         }
     }
 
-    private void guardar(EditorCodigo editor) {
+    private void guardar(
+            EditorCodigo editor
+    ) {
         try {
-            gestorProyecto.guardar(editor.ruta(), editor.getText());
+            gestorProyecto.guardar(
+                    editor.ruta(),
+                    editor.getText()
+            );
+
             editor.marcarGuardado();
-            actualizarTituloPestana(editor);
-            estado.setText("Archivo guardado: " + editor.ruta().getFileName());
+
+            actualizarTituloPestana(
+                    editor
+            );
+
+            estado.setText(
+                    "Archivo guardado: "
+                            + editor.ruta()
+                            .getFileName()
+            );
+
         } catch (IOException excepcion) {
-            mostrarError("No se pudo guardar el archivo", excepcion);
+
+            mostrarError(
+                    "No se pudo guardar el archivo",
+                    excepcion
+            );
         }
     }
 
-    private void actualizarTituloPestana(EditorCodigo editor) {
-        for (int indice = 0; indice < pestanas.getTabCount(); indice++) {
-            PanelEditor panel = (PanelEditor) pestanas.getComponentAt(indice);
-            if (panel.editor() == editor) {
-                pestanas.setTitleAt(indice, editor.ruta().getFileName().toString());
+    private void actualizarTituloPestana(
+            EditorCodigo editor
+    ) {
+        for (int indice = 0;
+             indice < pestanas.getTabCount();
+             indice++) {
+
+            PanelEditor panel =
+                    (PanelEditor)
+                            pestanas.getComponentAt(
+                                    indice
+                            );
+
+            if (panel.editor()
+                    == editor) {
+
+                pestanas.setTitleAt(
+                        indice,
+                        editor.ruta()
+                                .getFileName()
+                                .toString()
+                );
+
                 return;
             }
         }
@@ -311,53 +745,174 @@ public final class VentanaPrincipal extends JFrame {
 
     private void analizarProyecto() {
         if (raizProyecto == null) {
+
             JOptionPane.showMessageDialog(
                     this,
                     "Primero debe abrir una carpeta de proyecto",
                     "Proyecto no seleccionado",
                     JOptionPane.INFORMATION_MESSAGE
             );
+
             return;
         }
 
         try {
             guardarTodos();
-            ProyectoCompilacion proyecto = gestorProyecto.abrir(raizProyecto);
-            ResultadoCompilacion resultado = compilador.compilar(proyecto);
-            modeloDiagnosticos.actualizar(resultado.diagnosticos());
 
-            String mensaje = resultado.esValido()
-                    ? "Analisis inicial completado sin errores"
-                    : "Analisis inicial completado con errores";
-            estado.setText(mensaje + " | Archivos: " + proyecto.archivos().size());
+            modeloDiagnosticos.actualizar(
+                    List.of()
+            );
+
+            panelCuartetas.limpiar();
+
+            panelMemoria.limpiar();
+
+            actualizarTitulosResultados();
+
+            ProyectoCompilacion proyecto =
+                    gestorProyecto.abrir(
+                            raizProyecto
+                    );
+
+            ResultadoCompilacion resultado =
+                    compilador.compilar(
+                            proyecto
+                    );
+
+            modeloDiagnosticos.actualizar(
+                    resultado.diagnosticos()
+            );
+
+            panelCuartetas.mostrar(
+                    resultado.programaIntermedio()
+            );
+
+            panelMemoria.mostrar(
+                    resultado.programaMemoria()
+            );
+
+            actualizarTitulosResultados();
+
+            if (resultado.esValido()) {
+
+                pestanasResultados.setSelectedIndex(
+                        2
+                );
+
+            } else {
+
+                pestanasResultados.setSelectedIndex(
+                        0
+                );
+            }
+
+            String mensaje =
+                    resultado.esValido()
+                            ? "Analisis completado sin errores"
+                            : "Analisis completado con errores";
+
+            estado.setText(
+                    mensaje
+                            + " | Archivos: "
+                            + proyecto.archivos()
+                            .size()
+                            + " | Diagnosticos: "
+                            + resultado.diagnosticos()
+                            .size()
+                            + " | Cuartetas: "
+                            + panelCuartetas.modelo()
+                            .getRowCount()
+                            + " | Memoria: "
+                            + panelMemoria.modelo()
+                            .getRowCount()
+            );
+
         } catch (IOException | RuntimeException excepcion) {
-            mostrarError("No se pudo analizar el proyecto", excepcion);
+
+            panelCuartetas.limpiar();
+
+            panelMemoria.limpiar();
+
+            actualizarTitulosResultados();
+
+            mostrarError(
+                    "No se pudo analizar el proyecto",
+                    excepcion
+            );
         }
     }
 
+    private void actualizarTitulosResultados() {
+        pestanasResultados.setTitleAt(
+                0,
+                "Diagnosticos ("
+                        + modeloDiagnosticos
+                        .getRowCount()
+                        + ")"
+        );
+
+        pestanasResultados.setTitleAt(
+                1,
+                "Cuartetas ("
+                        + panelCuartetas.modelo()
+                        .getRowCount()
+                        + ")"
+        );
+
+        pestanasResultados.setTitleAt(
+                2,
+                "Memoria / C3D ("
+                        + panelMemoria.modelo()
+                        .getRowCount()
+                        + ")"
+        );
+    }
+
     private void intentarCerrar() {
-        List<EditorCodigo> modificados = new ArrayList<>();
-        for (int indice = 0; indice < pestanas.getTabCount(); indice++) {
-            PanelEditor panel = (PanelEditor) pestanas.getComponentAt(indice);
-            if (panel.editor().modificado()) {
-                modificados.add(panel.editor());
+        List<EditorCodigo> modificados =
+                new ArrayList<>();
+
+        for (int indice = 0;
+             indice < pestanas.getTabCount();
+             indice++) {
+
+            PanelEditor panel =
+                    (PanelEditor)
+                            pestanas.getComponentAt(
+                                    indice
+                            );
+
+            if (panel.editor()
+                    .modificado()) {
+
+                modificados.add(
+                        panel.editor()
+                );
             }
         }
 
         if (!modificados.isEmpty()) {
-            int opcion = JOptionPane.showConfirmDialog(
-                    this,
-                    "Hay archivos sin guardar. Desea guardarlos antes de salir?",
-                    "Cambios pendientes",
-                    JOptionPane.YES_NO_CANCEL_OPTION,
-                    JOptionPane.WARNING_MESSAGE
-            );
 
-            if (opcion == JOptionPane.CANCEL_OPTION
-                    || opcion == JOptionPane.CLOSED_OPTION) {
+            int opcion =
+                    JOptionPane.showConfirmDialog(
+                            this,
+                            "Hay archivos sin guardar. Desea guardarlos antes de salir?",
+                            "Cambios pendientes",
+                            JOptionPane.YES_NO_CANCEL_OPTION,
+                            JOptionPane.WARNING_MESSAGE
+                    );
+
+            if (opcion
+                    == JOptionPane.CANCEL_OPTION
+                    || opcion
+                    == JOptionPane.CLOSED_OPTION) {
+
                 return;
             }
-            if (opcion == JOptionPane.YES_OPTION) {
+
+            if (opcion
+                    == JOptionPane.YES_OPTION) {
+
                 guardarTodos();
             }
         }
@@ -365,10 +920,15 @@ public final class VentanaPrincipal extends JFrame {
         dispose();
     }
 
-    private void mostrarError(String mensaje, Exception excepcion) {
+    private void mostrarError(
+            String mensaje,
+            Exception excepcion
+    ) {
         JOptionPane.showMessageDialog(
                 this,
-                mensaje + ": " + excepcion.getMessage(),
+                mensaje
+                        + ": "
+                        + excepcion.getMessage(),
                 "Error",
                 JOptionPane.ERROR_MESSAGE
         );

@@ -6,6 +6,7 @@ import com.compi2.contacto.antlr.y.YLexer;
 import com.compi2.contacto.antlr.y.YParser;
 import com.compi2.contacto.antlr.zetariano.ZetarianoLexer;
 import com.compi2.contacto.antlr.zetariano.ZetarianoParser;
+import com.compi2.contacto.ast.ProgramaAst;
 import com.compi2.contacto.errores.Diagnostico;
 import com.compi2.contacto.errores.Severidad;
 import com.compi2.contacto.errores.TipoDiagnostico;
@@ -18,6 +19,7 @@ import org.antlr.v4.runtime.Parser;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,42 +29,109 @@ public final class AnalizadorArchivo {
             "\\bpublic\\s+class\\s+([A-Za-z_][A-Za-z0-9_]*)"
     );
 
-    public ResultadoAnalisisArchivo analizar(ArchivoFuente archivo) {
-        Objects.requireNonNull(archivo, "El archivo es obligatorio");
+    public ResultadoAnalisisArchivo analizar(
+            ArchivoFuente archivo
+    ) {
+        Objects.requireNonNull(
+                archivo,
+                "El archivo es obligatorio"
+        );
 
-        List<Diagnostico> diagnosticos = new ArrayList<>();
+        List<Diagnostico> diagnosticos =
+                new ArrayList<>();
 
-        switch (archivo.lenguaje()) {
-            case Y -> analizarY(archivo, diagnosticos);
-            case ZETARIANO -> analizarZetariano(archivo, diagnosticos);
-            case PIG_LATIN -> analizarPigLatin(archivo, diagnosticos);
-        }
+        Optional<ProgramaAst> ast =
+                switch (archivo.lenguaje()) {
+                    case Y -> analizarY(
+                            archivo,
+                            diagnosticos
+                    );
+
+                    case ZETARIANO -> analizarZetariano(
+                            archivo,
+                            diagnosticos
+                    );
+
+
+                    case PIG_LATIN -> analizarPigLatin(
+                            archivo,
+                            diagnosticos
+                    );
+
+                };
 
         if (archivo.contenido().isBlank()) {
-            diagnosticos.add(new Diagnostico(
-                    TipoDiagnostico.PROYECTO,
-                    Severidad.ADVERTENCIA,
-                    archivo.ruta(),
-                    1,
-                    0,
-                    "El archivo esta vacio"
-            ));
+            diagnosticos.add(
+                    new Diagnostico(
+                            TipoDiagnostico.PROYECTO,
+                            Severidad.ADVERTENCIA,
+                            archivo.ruta(),
+                            1,
+                            0,
+                            "El archivo esta vacio"
+                    )
+            );
         }
 
-        return new ResultadoAnalisisArchivo(archivo, diagnosticos);
+        return new ResultadoAnalisisArchivo(
+                archivo,
+                diagnosticos,
+                ast
+        );
     }
 
-    private void analizarY(
+    private Optional<ProgramaAst> analizarY(
             ArchivoFuente archivo,
             List<Diagnostico> diagnosticos
     ) {
-        YLexer lexer = new YLexer(CharStreams.fromString(archivo.contenido()));
-        configurarLexer(archivo, lexer, diagnosticos);
-        TokenizadorIndentacionY indentacion = new TokenizadorIndentacionY(lexer);
-        registrarErroresIndentacion(archivo, indentacion, diagnosticos);
-        YParser parser = new YParser(new CommonTokenStream(indentacion));
-        configurarParser(archivo, parser, diagnosticos);
-        parser.archivo();
+        YLexer lexer = new YLexer(
+                CharStreams.fromString(
+                        archivo.contenido()
+                )
+        );
+
+        configurarLexer(
+                archivo,
+                lexer,
+                diagnosticos
+        );
+
+        TokenizadorIndentacionY indentacion =
+                new TokenizadorIndentacionY(
+                        lexer
+                );
+
+        registrarErroresIndentacion(
+                archivo,
+                indentacion,
+                diagnosticos
+        );
+
+        YParser parser = new YParser(
+                new CommonTokenStream(
+                        indentacion
+                )
+        );
+
+        configurarParser(
+                archivo,
+                parser,
+                diagnosticos
+        );
+
+        YParser.ArchivoContext arbol =
+                parser.archivo();
+
+        if (contieneErrores(diagnosticos)) {
+            return Optional.empty();
+        }
+
+        ProgramaAst ast =
+                new YAstBuilder(
+                        archivo.ruta()
+                ).construir(arbol);
+
+        return Optional.of(ast);
     }
 
     private void registrarErroresIndentacion(
@@ -70,45 +139,111 @@ public final class AnalizadorArchivo {
             TokenizadorIndentacionY indentacion,
             List<Diagnostico> diagnosticos
     ) {
-        indentacion.erroresIndentacion().forEach(token ->
-                diagnosticos.add(new Diagnostico(
-                        TipoDiagnostico.SINTACTICO,
-                        Severidad.ERROR,
-                        archivo.ruta(),
-                        Math.max(token.getLine(), 1),
-                        Math.max(token.getCharPositionInLine(), 0),
-                        token.getText()
-                ))
-        );
+        indentacion.erroresIndentacion()
+                .forEach(token ->
+                        diagnosticos.add(
+                                new Diagnostico(
+                                        TipoDiagnostico.SINTACTICO,
+                                        Severidad.ERROR,
+                                        archivo.ruta(),
+                                        Math.max(
+                                                token.getLine(),
+                                                1
+                                        ),
+                                        Math.max(
+                                                token.getCharPositionInLine(),
+                                                0
+                                        ),
+                                        token.getText()
+                                )
+                        )
+                );
     }
 
-    private void analizarZetariano(
+private Optional<ProgramaAst> analizarZetariano(
+        ArchivoFuente archivo,
+        List<Diagnostico> diagnosticos
+) {
+    ZetarianoLexer lexer =
+            new ZetarianoLexer(
+                    CharStreams.fromString(
+                            archivo.contenido()
+                    )
+            );
+
+    ZetarianoParser parser =
+            new ZetarianoParser(
+                    new CommonTokenStream(
+                            lexer
+                    )
+            );
+
+    configurar(
+            archivo,
+            lexer,
+            parser,
+            diagnosticos
+    );
+
+    ZetarianoParser.ArchivoContext arbol =
+            parser.archivo();
+
+    if (contieneErrores(diagnosticos)) {
+        return Optional.empty();
+    }
+
+    ProgramaAst ast =
+            new ZAstBuilder(
+                    archivo.ruta()
+            ).construir(arbol);
+
+
+    validarNombreClase(
+            archivo,
+            diagnosticos
+    );
+
+    return Optional.of(ast);
+}
+
+    private Optional<ProgramaAst> analizarPigLatin(
             ArchivoFuente archivo,
             List<Diagnostico> diagnosticos
     ) {
-        ZetarianoLexer lexer = new ZetarianoLexer(
-                CharStreams.fromString(archivo.contenido())
-        );
-        ZetarianoParser parser = new ZetarianoParser(
-                new CommonTokenStream(lexer)
-        );
-        configurar(archivo, lexer, parser, diagnosticos);
-        parser.archivo();
-        validarNombreClase(archivo, diagnosticos);
-    }
+        PigLatinLexer lexer =
+                new PigLatinLexer(
+                        CharStreams.fromString(
+                                archivo.contenido()
+                        )
+                );
 
-    private void analizarPigLatin(
-            ArchivoFuente archivo,
-            List<Diagnostico> diagnosticos
-    ) {
-        PigLatinLexer lexer = new PigLatinLexer(
-                CharStreams.fromString(archivo.contenido())
+        PigLatinParser parser =
+                new PigLatinParser(
+                        new CommonTokenStream(
+                                lexer
+                        )
+                );
+
+        configurar(
+                archivo,
+                lexer,
+                parser,
+                diagnosticos
         );
-        PigLatinParser parser = new PigLatinParser(
-                new CommonTokenStream(lexer)
-        );
-        configurar(archivo, lexer, parser, diagnosticos);
-        parser.archivo();
+
+        PigLatinParser.ArchivoContext arbol =
+                parser.archivo();
+
+        if (contieneErrores(diagnosticos)) {
+            return Optional.empty();
+        }
+
+        ProgramaAst ast =
+                new PAstBuilder(
+                        archivo.ruta()
+                ).construir(arbol);
+
+        return Optional.of(ast);
     }
 
     private void configurar(
@@ -117,8 +252,17 @@ public final class AnalizadorArchivo {
             Parser parser,
             List<Diagnostico> diagnosticos
     ) {
-        configurarLexer(archivo, lexer, diagnosticos);
-        configurarParser(archivo, parser, diagnosticos);
+        configurarLexer(
+                archivo,
+                lexer,
+                diagnosticos
+        );
+
+        configurarParser(
+                archivo,
+                parser,
+                diagnosticos
+        );
     }
 
     private void configurarLexer(
@@ -127,11 +271,14 @@ public final class AnalizadorArchivo {
             List<Diagnostico> diagnosticos
     ) {
         lexer.removeErrorListeners();
-        lexer.addErrorListener(new RecolectorErroresAntlr(
-                archivo.ruta(),
-                TipoDiagnostico.LEXICO,
-                diagnosticos
-        ));
+
+        lexer.addErrorListener(
+                new RecolectorErroresAntlr(
+                        archivo.ruta(),
+                        TipoDiagnostico.LEXICO,
+                        diagnosticos
+                )
+        );
     }
 
     private void configurarParser(
@@ -140,35 +287,57 @@ public final class AnalizadorArchivo {
             List<Diagnostico> diagnosticos
     ) {
         parser.removeErrorListeners();
-        parser.addErrorListener(new RecolectorErroresAntlr(
-                archivo.ruta(),
-                TipoDiagnostico.SINTACTICO,
-                diagnosticos
-        ));
+
+        parser.addErrorListener(
+                new RecolectorErroresAntlr(
+                        archivo.ruta(),
+                        TipoDiagnostico.SINTACTICO,
+                        diagnosticos
+                )
+        );
+    }
+
+    private boolean contieneErrores(
+            List<Diagnostico> diagnosticos
+    ) {
+        return diagnosticos.stream()
+                .anyMatch(Diagnostico::esError);
     }
 
     private void validarNombreClase(
             ArchivoFuente archivo,
             List<Diagnostico> diagnosticos
     ) {
-        Matcher matcher = CLASE_PUBLICA.matcher(archivo.contenido());
+        Matcher matcher =
+                CLASE_PUBLICA.matcher(
+                        archivo.contenido()
+                );
+
         if (!matcher.find()) {
             return;
         }
 
-        String nombreClase = matcher.group(1);
-        String nombreArchivo = archivo.nombre();
-        String esperado = nombreClase + ".z";
+        String nombreClase =
+                matcher.group(1);
+
+        String nombreArchivo =
+                archivo.nombre();
+
+        String esperado =
+                nombreClase + ".z";
 
         if (!nombreArchivo.equals(esperado)) {
-            diagnosticos.add(new Diagnostico(
-                    TipoDiagnostico.SEMANTICO,
-                    Severidad.ERROR,
-                    archivo.ruta(),
-                    1,
-                    0,
-                    "El archivo debe llamarse " + esperado
-            ));
+            diagnosticos.add(
+                    new Diagnostico(
+                            TipoDiagnostico.SEMANTICO,
+                            Severidad.ERROR,
+                            archivo.ruta(),
+                            1,
+                            0,
+                            "El archivo debe llamarse "
+                                    + esperado
+                    )
+            );
         }
     }
 }
