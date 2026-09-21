@@ -24,6 +24,7 @@ import com.compi2.contacto.semantica.TablaSimbolos;
 import com.compi2.contacto.memoria.BajadorLlamadasProyecto;
 import com.compi2.contacto.memoria.BajadorCadenasProyecto;
 import com.compi2.contacto.memoria.BajadorArreglosProyecto;
+import com.compi2.contacto.memoria.BajadorInicializadoresProyecto;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -199,6 +200,12 @@ public final class CompiladorProyecto {
                             .bajar(
                                     programaMemoria,
                                     planMemoria
+                            );
+
+            programaMemoria =
+                    new BajadorInicializadoresProyecto()
+                            .bajar(
+                                    programaMemoria
                             );
 
             programaMemoria =
