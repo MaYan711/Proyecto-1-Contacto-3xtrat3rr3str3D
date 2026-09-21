@@ -283,8 +283,30 @@ public final class BajadorLlamadasProyecto {
                 );
 
         if (marcoActual == null
-                || marcoConstructor.isEmpty()
                 || layout.isEmpty()) {
+
+            copiarParametrosSimbolicos(
+                    parametros
+            );
+
+            copiar(
+                    cuarteta
+            );
+
+            return;
+        }
+
+        if (marcoConstructor.isEmpty()) {
+
+            if (cantidad == 0) {
+
+                bajarConstructorImplicito(
+                        cuarteta,
+                        layout.orElseThrow()
+                );
+
+                return;
+            }
 
             copiarParametrosSimbolicos(
                     parametros
@@ -317,7 +339,10 @@ public final class BajadorLlamadasProyecto {
                 OperadorCuarteta.SUMAR,
                 "H",
                 String.valueOf(
-                        layoutObjeto.tamano()
+                        Math.max(
+                                1,
+                                layoutObjeto.tamano()
+                        )
                 ),
                 nuevoHeap
         );
@@ -399,6 +424,94 @@ public final class BajadorLlamadasProyecto {
         moverPAtras(
                 tamanoLlamador
         );
+    }
+
+    private void bajarConstructorImplicito(
+            Cuarteta cuarteta,
+            LayoutHeapProyecto layout
+    ) {
+        String referenciaObjeto =
+                nuevoTemporalObjeto();
+
+        agregar(
+                OperadorCuarteta.ASIGNAR,
+                "H",
+                null,
+                referenciaObjeto
+        );
+
+        int tamano =
+                Math.max(
+                        1,
+                        layout.tamano()
+                );
+
+        String nuevoHeap =
+                nuevoTemporalObjeto();
+
+        agregar(
+                OperadorCuarteta.SUMAR,
+                "H",
+                String.valueOf(
+                        tamano
+                ),
+                nuevoHeap
+        );
+
+        agregar(
+                OperadorCuarteta.ASIGNAR,
+                nuevoHeap,
+                null,
+                "H"
+        );
+
+        for (LayoutHeapProyecto.Campo campo
+                : layout.campos()) {
+
+            agregar(
+                    OperadorCuarteta.ESCRIBIR_HEAP,
+                    referenciaObjeto
+                            + "+"
+                            + campo.desplazamiento(),
+                    valorInicialCampo(
+                            campo.tipo()
+                    ),
+                    null
+            );
+        }
+
+        if (!esVacio(
+                cuarteta.resultado()
+        )) {
+
+            agregar(
+                    OperadorCuarteta.ASIGNAR,
+                    referenciaObjeto,
+                    null,
+                    cuarteta.resultado()
+            );
+        }
+    }
+
+    private String valorInicialCampo(
+            String tipo
+    ) {
+        if (tipo == null
+                || tipo.isBlank()) {
+
+            return "0";
+        }
+
+        return switch (tipo) {
+            case "int",
+                 "double",
+                 "char",
+                 "boolean" ->
+                    "0";
+
+            default ->
+                    "-1";
+        };
     }
 
     private String extraerClaseConstructor(
