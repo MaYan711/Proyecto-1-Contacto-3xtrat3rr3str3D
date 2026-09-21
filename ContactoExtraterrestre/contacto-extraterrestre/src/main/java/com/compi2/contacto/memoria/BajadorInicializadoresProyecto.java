@@ -103,6 +103,17 @@ public final class BajadorInicializadoresProyecto {
         String referencia =
                 cuarteta.resultado();
 
+        List<Integer> dimensionesLista =
+                dimensiones.orElseThrow();
+
+        int inicioDatos =
+                1
+                        + dimensionesLista.size();
+
+        int totalCeldas =
+                inicioDatos
+                        + valores.size();
+
         agregar(
                 OperadorCuarteta.ASIGNAR,
                 "H",
@@ -110,8 +121,25 @@ public final class BajadorInicializadoresProyecto {
                 referencia
         );
 
-        List<Integer> dimensionesLista =
-                dimensiones.orElseThrow();
+        String siguienteHeap =
+                "init_h"
+                        + siguienteTemporalHeap++;
+
+        agregar(
+                OperadorCuarteta.SUMAR,
+                "H",
+                String.valueOf(
+                        totalCeldas
+                ),
+                siguienteHeap
+        );
+
+        agregar(
+                OperadorCuarteta.ASIGNAR,
+                siguienteHeap,
+                null,
+                "H"
+        );
 
         agregar(
                 OperadorCuarteta.ESCRIBIR_HEAP,
@@ -142,10 +170,6 @@ public final class BajadorInicializadoresProyecto {
             );
         }
 
-        int inicioDatos =
-                1
-                        + dimensionesLista.size();
-
         for (int indice = 0;
              indice < valores.size();
              indice++) {
@@ -163,30 +187,6 @@ public final class BajadorInicializadoresProyecto {
                     null
             );
         }
-
-        int totalCeldas =
-                inicioDatos
-                        + valores.size();
-
-        String siguienteHeap =
-                "init_h"
-                        + siguienteTemporalHeap++;
-
-        agregar(
-                OperadorCuarteta.SUMAR,
-                "H",
-                String.valueOf(
-                        totalCeldas
-                ),
-                siguienteHeap
-        );
-
-        agregar(
-                OperadorCuarteta.ASIGNAR,
-                siguienteHeap,
-                null,
-                "H"
-        );
     }
 
     private Optional<List<Integer>> calcularDimensiones(

@@ -1,5 +1,7 @@
 package com.compi2.contacto.interfaz;
 
+import com.compi2.contacto.c3d.GeneradorCodigoC;
+import com.compi2.contacto.c3d.GeneradorCodigoTresDirecciones;
 import com.compi2.contacto.compilacion.CompiladorProyecto;
 import com.compi2.contacto.compilacion.ResultadoCompilacion;
 import com.compi2.contacto.editor.EditorCodigo;
@@ -7,7 +9,6 @@ import com.compi2.contacto.proyecto.ArchivoFuente;
 import com.compi2.contacto.proyecto.GestorProyecto;
 import com.compi2.contacto.proyecto.LenguajeFuente;
 import com.compi2.contacto.proyecto.ProyectoCompilacion;
-import com.compi2.contacto.c3d.GeneradorCodigoTresDirecciones;
 
 import javax.swing.BorderFactory;
 import javax.swing.JFileChooser;
@@ -56,8 +57,11 @@ public final class VentanaPrincipal extends JFrame {
     private final PanelCuartetas panelCuartetas;
     private final PanelCuartetas panelMemoria;
     private final PanelCodigoC3D panelCodigoC3D;
+    private final PanelCodigoC panelCodigoC;
     private final JLabel estado;
+
     private Path raizProyecto;
+    private String codigoCActual;
 
     public VentanaPrincipal() {
         super("Contacto 3xtrat3rr3str3D");
@@ -85,6 +89,12 @@ public final class VentanaPrincipal extends JFrame {
 
         panelCodigoC3D =
                 new PanelCodigoC3D();
+
+        panelCodigoC =
+                new PanelCodigoC();
+
+        codigoCActual =
+                "";
 
         estado =
                 new JLabel(
@@ -238,6 +248,11 @@ public final class VentanaPrincipal extends JFrame {
                 panelCodigoC3D
         );
 
+        pestanasResultados.addTab(
+                "Codigo C",
+                panelCodigoC
+        );
+
         JSplitPane centroVertical =
                 new JSplitPane(
                         JSplitPane.VERTICAL_SPLIT,
@@ -381,8 +396,24 @@ public final class VentanaPrincipal extends JFrame {
                         analizarProyecto()
         );
 
+        JMenuItem guardarC =
+                new JMenuItem(
+                        "Guardar codigo C..."
+                );
+
+        guardarC.addActionListener(
+                evento ->
+                        guardarCodigoC()
+        );
+
         compilacion.add(
                 analizar
+        );
+
+        compilacion.addSeparator();
+
+        compilacion.add(
+                guardarC
         );
 
         barra.add(
@@ -457,15 +488,7 @@ public final class VentanaPrincipal extends JFrame {
 
             pestanas.removeAll();
 
-            modeloDiagnosticos.actualizar(
-                    List.of()
-            );
-
-            panelCuartetas.limpiar();
-
-            panelMemoria.limpiar();
-
-            panelCodigoC3D.limpiar();
+            limpiarResultados();
 
             actualizarTitulosResultados();
 
@@ -499,6 +522,7 @@ public final class VentanaPrincipal extends JFrame {
         if (!Files.isDirectory(
                 ruta
         )) {
+
             return nodo;
         }
 
@@ -532,6 +556,7 @@ public final class VentanaPrincipal extends JFrame {
         }
 
         for (Path hijo : hijos) {
+
             nodo.add(
                     crearNodo(
                             hijo
@@ -591,6 +616,7 @@ public final class VentanaPrincipal extends JFrame {
         if (Files.isRegularFile(
                 ruta
         )) {
+
             abrirArchivo(
                     ruta
             );
@@ -770,14 +796,7 @@ public final class VentanaPrincipal extends JFrame {
         try {
             guardarTodos();
 
-            modeloDiagnosticos.actualizar(
-                    List.of()
-            );
-
-            panelCuartetas.limpiar();
-
-            panelMemoria.limpiar();
-            panelCodigoC3D.limpiar();
+            limpiarResultados();
 
             actualizarTitulosResultados();
 
@@ -803,6 +822,34 @@ public final class VentanaPrincipal extends JFrame {
                     resultado.programaMemoria()
             );
 
+            if (!resultado.esValido()) {
+
+                codigoCActual =
+                        "";
+
+                panelCodigoC3D.limpiar();
+
+                panelCodigoC.limpiar();
+
+                actualizarTitulosResultados();
+
+                pestanasResultados.setSelectedIndex(
+                        0
+                );
+
+                estado.setText(
+                        "Analisis completado con errores"
+                                + " | Archivos: "
+                                + proyecto.archivos()
+                                .size()
+                                + " | Diagnosticos: "
+                                + resultado.diagnosticos()
+                                .size()
+                );
+
+                return;
+            }
+
             String codigoC3D =
                     new GeneradorCodigoTresDirecciones()
                             .generar(
@@ -813,28 +860,50 @@ public final class VentanaPrincipal extends JFrame {
                     codigoC3D
             );
 
-            actualizarTitulosResultados();
+            try {
+                codigoCActual =
+                        new GeneradorCodigoC()
+                                .generar(
+                                        resultado.programaMemoria()
+                                );
 
-            if (resultado.esValido()) {
+                panelCodigoC.mostrar(
+                        codigoCActual
+                );
+
+            } catch (RuntimeException excepcion) {
+
+                codigoCActual =
+                        "";
+
+                panelCodigoC.limpiar();
+
+                actualizarTitulosResultados();
 
                 pestanasResultados.setSelectedIndex(
                         3
                 );
 
-            } else {
-
-                pestanasResultados.setSelectedIndex(
-                        0
+                estado.setText(
+                        "Analisis correcto, pero fallo la generacion de codigo C"
                 );
+
+                mostrarError(
+                        "No se pudo generar el codigo C",
+                        excepcion
+                );
+
+                return;
             }
 
-            String mensaje =
-                    resultado.esValido()
-                            ? "Analisis completado sin errores"
-                            : "Analisis completado con errores";
+            actualizarTitulosResultados();
+
+            pestanasResultados.setSelectedIndex(
+                    4
+            );
 
             estado.setText(
-                    mensaje
+                    "Analisis completado sin errores"
                             + " | Archivos: "
                             + proyecto.archivos()
                             .size()
@@ -849,12 +918,9 @@ public final class VentanaPrincipal extends JFrame {
                             .getRowCount()
             );
 
-        } catch (IOException | RuntimeException excepcion) {
+        } catch (IOException excepcion) {
 
-            panelCuartetas.limpiar();
-
-            panelMemoria.limpiar();
-            panelCodigoC3D.limpiar();
+            limpiarResultados();
 
             actualizarTitulosResultados();
 
@@ -862,7 +928,38 @@ public final class VentanaPrincipal extends JFrame {
                     "No se pudo analizar el proyecto",
                     excepcion
             );
+
+        } catch (RuntimeException excepcion) {
+
+            codigoCActual =
+                    "";
+
+            panelCodigoC.limpiar();
+
+            actualizarTitulosResultados();
+
+            mostrarError(
+                    "Ocurrio un error durante la compilacion",
+                    excepcion
+            );
         }
+    }
+
+    private void limpiarResultados() {
+        modeloDiagnosticos.actualizar(
+                List.of()
+        );
+
+        panelCuartetas.limpiar();
+
+        panelMemoria.limpiar();
+
+        panelCodigoC3D.limpiar();
+
+        panelCodigoC.limpiar();
+
+        codigoCActual =
+                "";
     }
 
     private void actualizarTitulosResultados() {
@@ -889,10 +986,99 @@ public final class VentanaPrincipal extends JFrame {
                         .getRowCount()
                         + ")"
         );
+
         pestanasResultados.setTitleAt(
                 3,
                 "Codigo C3D"
         );
+
+        pestanasResultados.setTitleAt(
+                4,
+                "Codigo C"
+        );
+    }
+
+    private void guardarCodigoC() {
+        if (raizProyecto == null) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Primero debe abrir una carpeta de proyecto",
+                    "Proyecto no seleccionado",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            return;
+        }
+
+        if (codigoCActual == null
+                || codigoCActual.isBlank()) {
+
+            analizarProyecto();
+
+            if (codigoCActual == null
+                    || codigoCActual.isBlank()) {
+
+                return;
+            }
+        }
+
+        JFileChooser selector =
+                new JFileChooser();
+
+        selector.setDialogTitle(
+                "Guardar codigo C"
+        );
+
+        selector.setSelectedFile(
+                new java.io.File(
+                        "programa.c"
+                )
+        );
+
+        if (selector.showSaveDialog(
+                this
+        ) != JFileChooser.APPROVE_OPTION) {
+
+            return;
+        }
+
+        Path destino =
+                selector.getSelectedFile()
+                        .toPath();
+
+        if (!destino.getFileName()
+                .toString()
+                .toLowerCase()
+                .endsWith(".c")) {
+
+            destino =
+                    destino.resolveSibling(
+                            destino.getFileName()
+                                    .toString()
+                                    + ".c"
+                    );
+        }
+
+        try {
+            Files.writeString(
+                    destino,
+                    codigoCActual,
+                    StandardCharsets.UTF_8
+            );
+
+            estado.setText(
+                    "Codigo C guardado: "
+                            + destino
+            );
+
+        } catch (IOException excepcion) {
+
+            mostrarError(
+                    "No se pudo guardar el codigo C",
+                    excepcion
+            );
+        }
     }
 
     private void intentarCerrar() {
@@ -955,7 +1141,12 @@ public final class VentanaPrincipal extends JFrame {
                 this,
                 mensaje
                         + ": "
-                        + excepcion.getMessage(),
+                        + (
+                        excepcion.getMessage() == null
+                                ? excepcion.getClass()
+                                .getSimpleName()
+                                : excepcion.getMessage()
+                ),
                 "Error",
                 JOptionPane.ERROR_MESSAGE
         );
