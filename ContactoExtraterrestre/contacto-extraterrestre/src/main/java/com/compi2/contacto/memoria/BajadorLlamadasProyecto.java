@@ -14,13 +14,15 @@ public final class BajadorLlamadasProyecto {
     private PlanMemoriaProyecto plan;
     private ProgramaIntermedio destino;
     private MarcoStackProyecto marcoActual;
+    private String funcionActual;
     private final List<ParametroPendiente> parametrosPendientes;
+    private final List<FuncionDisponible> funcionesDisponibles;
     private int siguienteTemporal;
     private int siguienteTemporalObjeto;
 
     public BajadorLlamadasProyecto() {
-        parametrosPendientes =
-                new ArrayList<>();
+        parametrosPendientes = new ArrayList<>();
+        funcionesDisponibles = new ArrayList<>();
     }
 
     public ProgramaIntermedio bajar(
@@ -32,26 +34,23 @@ public final class BajadorLlamadasProyecto {
                 "El programa intermedio es obligatorio"
         );
 
-        this.plan =
-                Objects.requireNonNull(
-                        plan,
-                        "El plan de memoria es obligatorio"
-                );
+        this.plan = Objects.requireNonNull(
+                plan,
+                "El plan de memoria es obligatorio"
+        );
 
-        destino =
-                new ProgramaIntermedio();
-
+        destino = new ProgramaIntermedio();
         marcoActual = null;
+        funcionActual = null;
         parametrosPendientes.clear();
+        funcionesDisponibles.clear();
         siguienteTemporal = 0;
         siguienteTemporalObjeto = 0;
 
-        for (Cuarteta cuarteta
-                : origen.cuartetas()) {
+        registrarFunciones(origen);
 
-            procesar(
-                    cuarteta
-            );
+        for (Cuarteta cuarteta : origen.cuartetas()) {
+            procesar(cuarteta);
         }
 
         vaciarParametrosRestantes();
@@ -59,40 +58,56 @@ public final class BajadorLlamadasProyecto {
         return destino;
     }
 
+    private void registrarFunciones(
+            ProgramaIntermedio programa
+    ) {
+        for (Cuarteta cuarteta : programa.cuartetas()) {
+            if (cuarteta.operador()
+                    != OperadorCuarteta.INICIO_FUNCION) {
+                continue;
+            }
+
+            int cantidadParametros =
+                    entero(
+                            cuarteta.resultado(),
+                            -1
+                    );
+
+            if (cantidadParametros < 0
+                    || esVacio(cuarteta.argumento1())) {
+                continue;
+            }
+
+            funcionesDisponibles.add(
+                    new FuncionDisponible(
+                            cuarteta.argumento1(),
+                            cantidadParametros
+                    )
+            );
+        }
+    }
+
     private void procesar(
             Cuarteta cuarteta
     ) {
         switch (cuarteta.operador()) {
-
             case INICIO_FUNCION ->
-                    iniciarFuncion(
-                            cuarteta
-                    );
+                    iniciarFuncion(cuarteta);
 
             case FIN_FUNCION ->
-                    finalizarFuncion(
-                            cuarteta
-                    );
+                    finalizarFuncion(cuarteta);
 
             case PARAMETRO ->
-                    registrarParametro(
-                            cuarteta
-                    );
+                    registrarParametro(cuarteta);
 
             case LLAMAR ->
-                    bajarLlamada(
-                            cuarteta
-                    );
+                    bajarLlamada(cuarteta);
 
             case NUEVO_OBJETO ->
-                    bajarNuevoObjeto(
-                            cuarteta
-                    );
+                    bajarNuevoObjeto(cuarteta);
 
             default ->
-                    copiar(
-                            cuarteta
-                    );
+                    copiar(cuarteta);
         }
     }
 
@@ -101,16 +116,15 @@ public final class BajadorLlamadasProyecto {
     ) {
         vaciarParametrosRestantes();
 
+        funcionActual =
+                cuarteta.argumento1();
+
         marcoActual =
                 plan.marco(
-                        cuarteta.argumento1()
-                ).orElse(
-                        null
-                );
+                        funcionActual
+                ).orElse(null);
 
-        copiar(
-                cuarteta
-        );
+        copiar(cuarteta);
     }
 
     private void finalizarFuncion(
@@ -118,11 +132,10 @@ public final class BajadorLlamadasProyecto {
     ) {
         vaciarParametrosRestantes();
 
-        copiar(
-                cuarteta
-        );
+        copiar(cuarteta);
 
         marcoActual = null;
+        funcionActual = null;
     }
 
     private void registrarParametro(
@@ -139,7 +152,7 @@ public final class BajadorLlamadasProyecto {
     private void bajarLlamada(
             Cuarteta cuarteta
     ) {
-        int cantidad =
+        int cantidadExplicita =
                 entero(
                         cuarteta.argumento2(),
                         0
@@ -147,13 +160,39 @@ public final class BajadorLlamadasProyecto {
 
         List<ParametroPendiente> parametros =
                 consumirUltimos(
-                        cantidad
+                        cantidadExplicita
                 );
+
+        String destinoLlamada =
+                cuarteta.argumento1();
 
         Optional<MarcoStackProyecto> marcoDestino =
                 plan.marco(
-                        cuarteta.argumento1()
+                        destinoLlamada
                 );
+
+        boolean llamadaInternaZ = false;
+
+        if (marcoDestino.isEmpty()) {
+            Optional<String> resuelto =
+                    resolverMetodoInternoZ(
+                            destinoLlamada,
+                            cantidadExplicita
+                    );
+
+            if (resuelto.isPresent()) {
+                destinoLlamada =
+                        resuelto.orElseThrow();
+
+                marcoDestino =
+                        plan.marco(
+                                destinoLlamada
+                        );
+
+                llamadaInternaZ =
+                        marcoDestino.isPresent();
+            }
+        }
 
         if (marcoActual == null
                 || marcoDestino.isEmpty()) {
@@ -162,11 +201,77 @@ public final class BajadorLlamadasProyecto {
                     parametros
             );
 
-            copiar(
-                    cuarteta
-            );
+            copiar(cuarteta);
 
             return;
+        }
+
+        int cantidadTotal =
+                cantidadExplicita;
+
+        if (llamadaInternaZ) {
+            Optional<SlotStackProyecto> thisSlot =
+                    marcoActual.thisSlot();
+
+            if (thisSlot.isEmpty()) {
+                copiarParametrosSimbolicos(
+                        parametros
+                );
+
+                copiar(cuarteta);
+
+                return;
+            }
+
+            String referenciaThis =
+                    nuevoTemporal();
+
+            agregar(
+                    OperadorCuarteta.LEER_STACK,
+                    thisSlot.orElseThrow()
+                            .direccion(),
+                    null,
+                    referenciaThis
+            );
+
+            List<ParametroPendiente> completos =
+                    new ArrayList<>();
+
+            completos.add(
+                    new ParametroPendiente(
+                            referenciaThis,
+                            "0"
+                    )
+            );
+
+            for (int indice = 0;
+                 indice < parametros.size();
+                 indice++) {
+
+                ParametroPendiente parametro =
+                        parametros.get(indice);
+
+                int indiceOriginal =
+                        entero(
+                                parametro.indice(),
+                                indice
+                        );
+
+                completos.add(
+                        new ParametroPendiente(
+                                parametro.valor(),
+                                String.valueOf(
+                                        indiceOriginal + 1
+                                )
+                        )
+                );
+            }
+
+            parametros =
+                    completos;
+
+            cantidadTotal =
+                    cantidadExplicita + 1;
         }
 
         int tamanoLlamador =
@@ -206,16 +311,18 @@ public final class BajadorLlamadasProyecto {
 
         agregar(
                 OperadorCuarteta.LLAMAR,
-                cuarteta.argumento1(),
-                cuarteta.argumento2(),
+                destinoLlamada,
+                String.valueOf(
+                        cantidadTotal
+                ),
                 null
         );
 
-        MarcoStackProyecto destinoLlamada =
+        MarcoStackProyecto destino =
                 marcoDestino.orElseThrow();
 
         boolean retornaValor =
-                destinoLlamada.retorno()
+                destino.retorno()
                         .map(
                                 slot ->
                                         !slot.tipo()
@@ -223,29 +330,185 @@ public final class BajadorLlamadasProyecto {
                                                         "void"
                                                 )
                         )
-                        .orElse(
-                                false
-                        );
-
-        String resultado =
-                cuarteta.resultado();
+                        .orElse(false);
 
         if (retornaValor
                 && !esVacio(
-                resultado
+                cuarteta.resultado()
         )) {
 
             agregar(
                     OperadorCuarteta.LEER_STACK,
                     "P+0",
                     null,
-                    resultado
+                    cuarteta.resultado()
             );
         }
 
         moverPAtras(
                 tamanoLlamador
         );
+    }
+
+    private Optional<String> resolverMetodoInternoZ(
+            String destino,
+            int cantidadExplicita
+    ) {
+        String clase =
+                claseFuncionActual();
+
+        if (clase == null) {
+            return Optional.empty();
+        }
+
+        String metodo =
+                nombreMetodo(
+                        destino
+                );
+
+        if (metodo == null
+                || metodo.equals("<init>")) {
+
+            return Optional.empty();
+        }
+
+        int cantidadEsperada =
+                cantidadExplicita + 1;
+
+        List<FuncionDisponible> candidatos =
+                funcionesDisponibles.stream()
+                        .filter(
+                                funcion ->
+                                        funcion.nombre()
+                                                .startsWith(
+                                                        clase + "."
+                                                )
+                        )
+                        .filter(
+                                funcion ->
+                                        metodo.equals(
+                                                nombreMetodo(
+                                                        funcion.nombre()
+                                                )
+                                        )
+                        )
+                        .filter(
+                                funcion ->
+                                        funcion.cantidadParametros()
+                                                == cantidadEsperada
+                        )
+                        .toList();
+
+        if (candidatos.size() == 1) {
+            return Optional.of(
+                    candidatos.get(0)
+                            .nombre()
+            );
+        }
+
+        if (candidatos.size() > 1
+                && destino.contains("(")) {
+
+            String firma =
+                    destino;
+
+            int punto =
+                    firma.lastIndexOf('.');
+
+            if (punto >= 0) {
+                firma =
+                        firma.substring(
+                                punto + 1
+                        );
+            }
+
+            String firmaFinal =
+                    firma;
+
+            List<FuncionDisponible> exactos =
+                    candidatos.stream()
+                            .filter(
+                                    funcion ->
+                                            funcion.nombre()
+                                                    .endsWith(
+                                                            "."
+                                                                    + firmaFinal
+                                                    )
+                            )
+                            .toList();
+
+            if (exactos.size() == 1) {
+                return Optional.of(
+                        exactos.get(0)
+                                .nombre()
+                );
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private String claseFuncionActual() {
+        if (funcionActual == null
+                || funcionActual.equals("MAIOR")) {
+            return null;
+        }
+
+        int punto =
+                funcionActual.indexOf('.');
+
+        if (punto <= 0) {
+            return null;
+        }
+
+        String clase =
+                funcionActual.substring(
+                        0,
+                        punto
+                );
+
+        return plan.layout(
+                "Z::" + clase
+        ).isPresent()
+                ? clase
+                : null;
+    }
+
+    private String nombreMetodo(
+            String nombre
+    ) {
+        if (nombre == null
+                || nombre.isBlank()) {
+            return null;
+        }
+
+        String resultado =
+                nombre;
+
+        int punto =
+                resultado.lastIndexOf('.');
+
+        if (punto >= 0
+                && punto < resultado.length() - 1) {
+
+            resultado =
+                    resultado.substring(
+                            punto + 1
+                    );
+        }
+
+        int parentesis =
+                resultado.indexOf('(');
+
+        if (parentesis >= 0) {
+            resultado =
+                    resultado.substring(
+                            0,
+                            parentesis
+                    );
+        }
+
+        return resultado;
     }
 
     private void bajarNuevoObjeto(
@@ -289,17 +552,13 @@ public final class BajadorLlamadasProyecto {
                     parametros
             );
 
-            copiar(
-                    cuarteta
-            );
+            copiar(cuarteta);
 
             return;
         }
 
         if (marcoConstructor.isEmpty()) {
-
             if (cantidad == 0) {
-
                 bajarConstructorImplicito(
                         cuarteta,
                         layout.orElseThrow()
@@ -312,9 +571,7 @@ public final class BajadorLlamadasProyecto {
                     parametros
             );
 
-            copiar(
-                    cuarteta
-            );
+            copiar(cuarteta);
 
             return;
         }
@@ -361,8 +618,7 @@ public final class BajadorLlamadasProyecto {
                 OperadorCuarteta.ESCRIBIR_STACK,
                 "P+"
                         + (
-                        tamanoLlamador
-                                + 1
+                        tamanoLlamador + 1
                 ),
                 referenciaObjeto,
                 null
@@ -498,7 +754,6 @@ public final class BajadorLlamadasProyecto {
     ) {
         if (tipo == null
                 || tipo.isBlank()) {
-
             return "0";
         }
 
@@ -519,7 +774,6 @@ public final class BajadorLlamadasProyecto {
     ) {
         if (constructor == null
                 || constructor.isBlank()) {
-
             return null;
         }
 
@@ -605,8 +859,7 @@ public final class BajadorLlamadasProyecto {
         int inicio =
                 Math.max(
                         0,
-                        disponibles
-                                - cantidad
+                        disponibles - cantidad
                 );
 
         List<ParametroPendiente> resultado =
@@ -657,7 +910,6 @@ public final class BajadorLlamadasProyecto {
         if (valor == null
                 || valor.isBlank()
                 || valor.equals("-")) {
-
             return predeterminado;
         }
 
@@ -667,7 +919,6 @@ public final class BajadorLlamadasProyecto {
             );
 
         } catch (NumberFormatException excepcion) {
-
             return predeterminado;
         }
     }
@@ -720,6 +971,12 @@ public final class BajadorLlamadasProyecto {
     private record ParametroPendiente(
             String valor,
             String indice
+    ) {
+    }
+
+    private record FuncionDisponible(
+            String nombre,
+            int cantidadParametros
     ) {
     }
 }
