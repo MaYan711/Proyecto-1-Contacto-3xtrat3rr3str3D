@@ -7,6 +7,7 @@ import com.compi2.contacto.proyecto.ArchivoFuente;
 import com.compi2.contacto.proyecto.GestorProyecto;
 import com.compi2.contacto.proyecto.LenguajeFuente;
 import com.compi2.contacto.proyecto.ProyectoCompilacion;
+import com.compi2.contacto.c3d.GeneradorCodigoTresDirecciones;
 
 import javax.swing.BorderFactory;
 import javax.swing.JFileChooser;
@@ -54,6 +55,7 @@ public final class VentanaPrincipal extends JFrame {
     private final ModeloTablaDiagnosticos modeloDiagnosticos;
     private final PanelCuartetas panelCuartetas;
     private final PanelCuartetas panelMemoria;
+    private final PanelCodigoC3D panelCodigoC3D;
     private final JLabel estado;
     private Path raizProyecto;
 
@@ -81,6 +83,8 @@ public final class VentanaPrincipal extends JFrame {
         panelMemoria =
                 new PanelCuartetas();
 
+        panelCodigoC3D =
+                new PanelCodigoC3D();
 
         estado =
                 new JLabel(
@@ -227,6 +231,11 @@ public final class VentanaPrincipal extends JFrame {
         pestanasResultados.addTab(
                 "Memoria / C3D",
                 panelMemoria
+        );
+
+        pestanasResultados.addTab(
+                "Codigo C3D",
+                panelCodigoC3D
         );
 
         JSplitPane centroVertical =
@@ -455,6 +464,8 @@ public final class VentanaPrincipal extends JFrame {
             panelCuartetas.limpiar();
 
             panelMemoria.limpiar();
+
+            panelCodigoC3D.limpiar();
 
             actualizarTitulosResultados();
 
@@ -766,6 +777,7 @@ public final class VentanaPrincipal extends JFrame {
             panelCuartetas.limpiar();
 
             panelMemoria.limpiar();
+            panelCodigoC3D.limpiar();
 
             actualizarTitulosResultados();
 
@@ -791,12 +803,22 @@ public final class VentanaPrincipal extends JFrame {
                     resultado.programaMemoria()
             );
 
+            String codigoC3D =
+                    new GeneradorCodigoTresDirecciones()
+                            .generar(
+                                    resultado.programaMemoria()
+                            );
+
+            panelCodigoC3D.mostrar(
+                    codigoC3D
+            );
+
             actualizarTitulosResultados();
 
             if (resultado.esValido()) {
 
                 pestanasResultados.setSelectedIndex(
-                        2
+                        3
                 );
 
             } else {
@@ -832,6 +854,7 @@ public final class VentanaPrincipal extends JFrame {
             panelCuartetas.limpiar();
 
             panelMemoria.limpiar();
+            panelCodigoC3D.limpiar();
 
             actualizarTitulosResultados();
 
@@ -865,6 +888,10 @@ public final class VentanaPrincipal extends JFrame {
                         + panelMemoria.modelo()
                         .getRowCount()
                         + ")"
+        );
+        pestanasResultados.setTitleAt(
+                3,
+                "Codigo C3D"
         );
     }
 
