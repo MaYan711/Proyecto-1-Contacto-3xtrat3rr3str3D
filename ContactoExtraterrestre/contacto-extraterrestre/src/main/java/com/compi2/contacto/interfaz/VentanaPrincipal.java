@@ -7,6 +7,8 @@ import com.compi2.contacto.proyecto.ArchivoFuente;
 import com.compi2.contacto.proyecto.GestorProyecto;
 import com.compi2.contacto.proyecto.LenguajeFuente;
 import com.compi2.contacto.proyecto.ProyectoCompilacion;
+import com.compi2.contacto.c3d.GeneradorCodigoTresDirecciones;
+import com.compi2.contacto.c3d.GeneradorCodigoC;
 
 import javax.swing.BorderFactory;
 import javax.swing.JFileChooser;
@@ -40,9 +42,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 public final class VentanaPrincipal extends JFrame {
 
@@ -50,23 +55,65 @@ public final class VentanaPrincipal extends JFrame {
     private final CompiladorProyecto compilador;
     private final JTree arbolProyecto;
     private final JTabbedPane pestanas;
+    private final JTabbedPane pestanasResultados;
     private final ModeloTablaDiagnosticos modeloDiagnosticos;
+    private final PanelCuartetas panelCuartetas;
+    private final PanelCuartetas panelMemoria;
+    private final PanelCodigoC3D panelCodigoC3D;
     private final JLabel estado;
     private Path raizProyecto;
+    private final PanelCodigoC panelCodigoC;
+    private String codigoCActual;
 
     public VentanaPrincipal() {
         super("Contacto 3xtrat3rr3str3D");
 
-        gestorProyecto = new GestorProyecto();
-        compilador = new CompiladorProyecto();
-        pestanas = new JTabbedPane();
-        modeloDiagnosticos = new ModeloTablaDiagnosticos();
-        estado = new JLabel("Abra una carpeta de proyecto para comenzar");
+        gestorProyecto =
+                new GestorProyecto();
 
-        DefaultMutableTreeNode raizInicial = new DefaultMutableTreeNode(
-                "Sin proyecto"
-        );
-        arbolProyecto = new JTree(new DefaultTreeModel(raizInicial));
+        compilador =
+                new CompiladorProyecto();
+
+        pestanas =
+                new JTabbedPane();
+
+        pestanasResultados =
+                new JTabbedPane();
+
+        modeloDiagnosticos =
+                new ModeloTablaDiagnosticos();
+
+        panelCuartetas =
+                new PanelCuartetas();
+
+        panelMemoria =
+                new PanelCuartetas();
+
+        panelCodigoC3D =
+                new PanelCodigoC3D();
+
+        estado =
+                new JLabel(
+                        "Abra una carpeta de proyecto para comenzar"
+                );
+
+        DefaultMutableTreeNode raizInicial =
+                new DefaultMutableTreeNode(
+                        "Sin proyecto"
+                );
+
+        arbolProyecto =
+                new JTree(
+                        new DefaultTreeModel(
+                                raizInicial
+                        )
+                );
+
+        panelCodigoC =
+                new PanelCodigoC();
+
+        codigoCActual =
+                "";
 
         configurarVentana();
         construirInterfaz();
@@ -74,290 +121,1301 @@ public final class VentanaPrincipal extends JFrame {
     }
 
     private void configurarVentana() {
-        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-        setMinimumSize(new Dimension(1050, 700));
-        setSize(1280, 820);
-        setLocationRelativeTo(null);
-        setJMenuBar(crearMenu());
+        setDefaultCloseOperation(
+                WindowConstants.DO_NOTHING_ON_CLOSE
+        );
+
+        setMinimumSize(
+                new Dimension(
+                        1050,
+                        700
+                )
+        );
+
+        setSize(
+                1280,
+                820
+        );
+
+        setLocationRelativeTo(
+                null
+        );
+
+        setJMenuBar(
+                crearMenu()
+        );
     }
 
     private void construirInterfaz() {
-        JPanel contenido = new JPanel(new BorderLayout());
-        contenido.setBackground(new Color(243, 244, 246));
+        JPanel contenido =
+                new JPanel(
+                        new BorderLayout()
+                );
 
-        arbolProyecto.setRootVisible(true);
-        arbolProyecto.setShowsRootHandles(true);
-        arbolProyecto.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        arbolProyecto.setCellRenderer(new RenderizadorArbolProyecto());
-
-        JScrollPane panelArbol = new JScrollPane(arbolProyecto);
-        panelArbol.setPreferredSize(new Dimension(260, 500));
-        panelArbol.setBorder(BorderFactory.createTitledBorder("Proyecto"));
-
-        JTable tablaDiagnosticos = new JTable(modeloDiagnosticos);
-        tablaDiagnosticos.setFillsViewportHeight(true);
-        tablaDiagnosticos.setAutoCreateRowSorter(true);
-        tablaDiagnosticos.setRowHeight(24);
-        tablaDiagnosticos.getColumnModel().getColumn(5)
-                .setPreferredWidth(600);
-
-        JScrollPane panelDiagnosticos = new JScrollPane(tablaDiagnosticos);
-        panelDiagnosticos.setBorder(
-                BorderFactory.createTitledBorder("Diagnosticos")
+        contenido.setBackground(
+                new Color(
+                        243,
+                        244,
+                        246
+                )
         );
 
-        JSplitPane centroVertical = new JSplitPane(
-                JSplitPane.VERTICAL_SPLIT,
-                pestanas,
+        arbolProyecto.setRootVisible(
+                true
+        );
+
+        arbolProyecto.setShowsRootHandles(
+                true
+        );
+
+        arbolProyecto.setFont(
+                new Font(
+                        "SansSerif",
+                        Font.PLAIN,
+                        14
+                )
+        );
+
+        arbolProyecto.setCellRenderer(
+                new RenderizadorArbolProyecto()
+        );
+
+        JScrollPane panelArbol =
+                new JScrollPane(
+                        arbolProyecto
+                );
+
+        panelArbol.setPreferredSize(
+                new Dimension(
+                        260,
+                        500
+                )
+        );
+
+        panelArbol.setBorder(
+                BorderFactory.createTitledBorder(
+                        "Proyecto"
+                )
+        );
+
+        JTable tablaDiagnosticos =
+                new JTable(
+                        modeloDiagnosticos
+                );
+
+        tablaDiagnosticos.setFillsViewportHeight(
+                true
+        );
+
+        tablaDiagnosticos.setAutoCreateRowSorter(
+                true
+        );
+
+        tablaDiagnosticos.setRowHeight(
+                24
+        );
+
+        tablaDiagnosticos.getColumnModel()
+                .getColumn(5)
+                .setPreferredWidth(
+                        600
+                );
+
+        JScrollPane panelDiagnosticos =
+                new JScrollPane(
+                        tablaDiagnosticos
+                );
+
+        panelDiagnosticos.setBorder(
+                BorderFactory.createEmptyBorder()
+        );
+
+        pestanasResultados.addTab(
+                "Diagnosticos",
                 panelDiagnosticos
         );
-        centroVertical.setResizeWeight(0.75);
 
-        JSplitPane principal = new JSplitPane(
-                JSplitPane.HORIZONTAL_SPLIT,
-                panelArbol,
-                centroVertical
+        pestanasResultados.addTab(
+                "Cuartetas",
+                panelCuartetas
         );
-        principal.setDividerLocation(270);
 
-        estado.setBorder(BorderFactory.createEmptyBorder(6, 10, 6, 10));
-        estado.setHorizontalAlignment(SwingConstants.LEFT);
+        pestanasResultados.addTab(
+                "Memoria / C3D",
+                panelMemoria
+        );
 
-        contenido.add(principal, BorderLayout.CENTER);
-        contenido.add(estado, BorderLayout.SOUTH);
-        setContentPane(contenido);
+        pestanasResultados.addTab(
+                "Codigo C3D",
+                panelCodigoC3D
+        );
+
+        pestanasResultados.addTab(
+                "Codigo C",
+                panelCodigoC
+        );
+
+        JSplitPane centroVertical =
+                new JSplitPane(
+                        JSplitPane.VERTICAL_SPLIT,
+                        pestanas,
+                        pestanasResultados
+                );
+
+        centroVertical.setResizeWeight(
+                0.72
+        );
+
+        centroVertical.setDividerLocation(
+                520
+        );
+
+        JSplitPane principal =
+                new JSplitPane(
+                        JSplitPane.HORIZONTAL_SPLIT,
+                        panelArbol,
+                        centroVertical
+                );
+
+        principal.setDividerLocation(
+                270
+        );
+
+        estado.setBorder(
+                BorderFactory.createEmptyBorder(
+                        6,
+                        10,
+                        6,
+                        10
+                )
+        );
+
+        estado.setHorizontalAlignment(
+                SwingConstants.LEFT
+        );
+
+        contenido.add(
+                principal,
+                BorderLayout.CENTER
+        );
+
+        contenido.add(
+                estado,
+                BorderLayout.SOUTH
+        );
+
+        setContentPane(
+                contenido
+        );
     }
 
     private JMenuBar crearMenu() {
-        JMenuBar barra = new JMenuBar();
+        JMenuBar barra =
+                new JMenuBar();
 
-        JMenu archivo = new JMenu("Archivo");
-        JMenuItem abrir = new JMenuItem("Abrir proyecto...");
-        abrir.setAccelerator(KeyStroke.getKeyStroke(
-                KeyEvent.VK_O,
-                InputEvent.CTRL_DOWN_MASK
-        ));
-        abrir.addActionListener(evento -> seleccionarProyecto());
+        JMenu archivo =
+                new JMenu(
+                        "Archivo"
+                );
 
-        JMenuItem guardar = new JMenuItem("Guardar archivo");
-        guardar.setAccelerator(KeyStroke.getKeyStroke(
-                KeyEvent.VK_S,
-                InputEvent.CTRL_DOWN_MASK
-        ));
-        guardar.addActionListener(evento -> guardarActivo());
+        JMenuItem abrir =
+                new JMenuItem(
+                        "Abrir proyecto..."
+                );
 
-        JMenuItem salir = new JMenuItem("Salir");
-        salir.addActionListener(evento -> intentarCerrar());
+        abrir.setAccelerator(
+                KeyStroke.getKeyStroke(
+                        KeyEvent.VK_O,
+                        InputEvent.CTRL_DOWN_MASK
+                )
+        );
 
-        archivo.add(abrir);
-        archivo.add(guardar);
+        abrir.addActionListener(
+                evento ->
+                        seleccionarProyecto()
+        );
+
+        JMenuItem guardar =
+                new JMenuItem(
+                        "Guardar archivo"
+                );
+
+        guardar.setAccelerator(
+                KeyStroke.getKeyStroke(
+                        KeyEvent.VK_S,
+                        InputEvent.CTRL_DOWN_MASK
+                )
+        );
+
+        guardar.addActionListener(
+                evento ->
+                        guardarActivo()
+        );
+
+        JMenuItem guardarTodosItem =
+                new JMenuItem(
+                        "Guardar todos"
+                );
+
+        guardarTodosItem.setAccelerator(
+                KeyStroke.getKeyStroke(
+                        KeyEvent.VK_S,
+                        InputEvent.CTRL_DOWN_MASK
+                                | InputEvent.SHIFT_DOWN_MASK
+                )
+        );
+
+        guardarTodosItem.addActionListener(
+                evento ->
+                        guardarTodos()
+        );
+
+        JMenuItem descargarArchivo =
+                new JMenuItem(
+                        "Descargar archivo seleccionado..."
+                );
+
+        descargarArchivo.addActionListener(
+                evento ->
+                        descargarArchivoSeleccionado()
+        );
+
+        JMenuItem descargarCarpeta =
+                new JMenuItem(
+                        "Descargar carpeta seleccionada..."
+                );
+
+        descargarCarpeta.addActionListener(
+                evento ->
+                        descargarCarpetaSeleccionada()
+        );
+
+        JMenuItem salir =
+                new JMenuItem(
+                        "Salir"
+                );
+
+        salir.addActionListener(
+                evento ->
+                        intentarCerrar()
+        );
+
+        archivo.add(
+                abrir
+        );
+
         archivo.addSeparator();
-        archivo.add(salir);
 
-        JMenu compilacion = new JMenu("Compilacion");
-        JMenuItem analizar = new JMenuItem("Analizar proyecto");
-        analizar.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F6, 0));
-        analizar.addActionListener(evento -> analizarProyecto());
-        compilacion.add(analizar);
+        archivo.add(
+                guardar
+        );
 
-        barra.add(archivo);
-        barra.add(compilacion);
+        archivo.add(
+                guardarTodosItem
+        );
+
+        archivo.addSeparator();
+
+        archivo.add(
+                descargarArchivo
+        );
+
+        archivo.add(
+                descargarCarpeta
+        );
+
+        archivo.addSeparator();
+
+        archivo.add(
+                salir
+        );
+
+        JMenu compilacion =
+                new JMenu(
+                        "Compilacion"
+                );
+
+        JMenuItem analizar =
+                new JMenuItem(
+                        "Analizar proyecto"
+                );
+
+        JMenuItem guardarC =
+                new JMenuItem(
+                        "Guardar codigo C..."
+                );
+
+        guardarC.addActionListener(
+                evento ->
+                        guardarCodigoC()
+        );
+
+        compilacion.add(
+                guardarC
+        );
+
+        analizar.setAccelerator(
+                KeyStroke.getKeyStroke(
+                        KeyEvent.VK_F6,
+                        0
+                )
+        );
+
+        analizar.addActionListener(
+                evento ->
+                        analizarProyecto()
+        );
+
+        compilacion.add(
+                analizar
+        );
+
+        barra.add(
+                archivo
+        );
+
+        barra.add(
+                compilacion
+        );
+
         return barra;
     }
 
     private void configurarEventos() {
-        arbolProyecto.addTreeSelectionListener(this::seleccionArbol);
+        arbolProyecto.addTreeSelectionListener(
+                this::seleccionArbol
+        );
 
-        addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent evento) {
-                intentarCerrar();
-            }
-        });
+        addWindowListener(
+                new WindowAdapter() {
+
+                    @Override
+                    public void windowClosing(
+                            WindowEvent evento
+                    ) {
+                        intentarCerrar();
+                    }
+                }
+        );
     }
 
     private void seleccionarProyecto() {
-        JFileChooser selector = new JFileChooser();
-        selector.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        selector.setDialogTitle("Seleccionar carpeta del proyecto");
+        JFileChooser selector =
+                new JFileChooser();
 
-        if (selector.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            abrirProyecto(selector.getSelectedFile().toPath());
+        selector.setFileSelectionMode(
+                JFileChooser.DIRECTORIES_ONLY
+        );
+
+        selector.setDialogTitle(
+                "Seleccionar carpeta del proyecto"
+        );
+
+        if (selector.showOpenDialog(this)
+                == JFileChooser.APPROVE_OPTION) {
+
+            abrirProyecto(
+                    selector.getSelectedFile()
+                            .toPath()
+            );
         }
     }
 
-    private void abrirProyecto(Path raiz) {
+    private void abrirProyecto(
+            Path raiz
+    ) {
         try {
-            raizProyecto = raiz.toAbsolutePath().normalize();
-            DefaultMutableTreeNode nodoRaiz = crearNodo(raizProyecto);
-            arbolProyecto.setModel(new DefaultTreeModel(nodoRaiz));
+            raizProyecto =
+                    raiz.toAbsolutePath()
+                            .normalize();
+
+            DefaultMutableTreeNode nodoRaiz =
+                    crearNodo(
+                            raizProyecto
+                    );
+
+            arbolProyecto.setModel(
+                    new DefaultTreeModel(
+                            nodoRaiz
+                    )
+            );
+
             pestanas.removeAll();
-            modeloDiagnosticos.actualizar(List.of());
-            estado.setText("Proyecto abierto: " + raizProyecto);
+
+            modeloDiagnosticos.actualizar(
+                    List.of()
+            );
+
+            panelCuartetas.limpiar();
+
+            panelMemoria.limpiar();
+
+            panelCodigoC3D.limpiar();
+
+            panelCodigoC.limpiar();
+
+            codigoCActual =
+                    "";
+
+            actualizarTitulosResultados();
+
+            pestanasResultados.setSelectedIndex(
+                    0
+            );
+
+            estado.setText(
+                    "Proyecto abierto: "
+                            + raizProyecto
+            );
+
         } catch (IOException excepcion) {
-            mostrarError("No se pudo abrir el proyecto", excepcion);
+
+            mostrarError(
+                    "No se pudo abrir el proyecto",
+                    excepcion
+            );
         }
     }
 
-    private DefaultMutableTreeNode crearNodo(Path ruta) throws IOException {
-        DefaultMutableTreeNode nodo = new DefaultMutableTreeNode(ruta);
+    private DefaultMutableTreeNode crearNodo(
+            Path ruta
+    ) throws IOException {
 
-        if (!Files.isDirectory(ruta)) {
+        DefaultMutableTreeNode nodo =
+                new DefaultMutableTreeNode(
+                        ruta
+                );
+
+        if (!Files.isDirectory(
+                ruta
+        )) {
             return nodo;
         }
 
         List<Path> hijos;
-        try (var flujo = Files.list(ruta)) {
-            hijos = flujo
-                    .filter(this::mostrarEnArbol)
-                    .sorted(Comparator
-                            .comparing((Path path) -> !Files.isDirectory(path))
-                            .thenComparing(path -> path.getFileName().toString()))
-                    .toList();
+
+        try (var flujo =
+                     Files.list(
+                             ruta
+                     )) {
+
+            hijos =
+                    flujo
+                            .filter(
+                                    this::mostrarEnArbol
+                            )
+                            .sorted(
+                                    Comparator
+                                            .comparing(
+                                                    (Path path) ->
+                                                            !Files.isDirectory(
+                                                                    path
+                                                            )
+                                            )
+                                            .thenComparing(
+                                                    path ->
+                                                            path.getFileName()
+                                                                    .toString()
+                                            )
+                            )
+                            .toList();
         }
 
         for (Path hijo : hijos) {
-            nodo.add(crearNodo(hijo));
+            nodo.add(
+                    crearNodo(
+                            hijo
+                    )
+            );
         }
 
         return nodo;
     }
 
-    private boolean mostrarEnArbol(Path ruta) {
-        if (Files.isDirectory(ruta)) {
-            String nombre = ruta.getFileName().toString();
-            return !nombre.equals("target")
-                    && !nombre.equals(".idea")
-                    && !nombre.equals(".git");
+    private boolean mostrarEnArbol(
+            Path ruta
+    ) {
+        if (Files.isDirectory(
+                ruta
+        )) {
+
+            String nombre =
+                    ruta.getFileName()
+                            .toString();
+
+            return !nombre.equals(
+                    "target"
+            )
+                    && !nombre.equals(
+                    ".idea"
+            )
+                    && !nombre.equals(
+                    ".git"
+            );
         }
-        return LenguajeFuente.desdeRuta(ruta).isPresent();
+
+        return LenguajeFuente.desdeRuta(
+                ruta
+        ).isPresent();
     }
 
-    private void seleccionArbol(TreeSelectionEvent evento) {
-        Object seleccionado = arbolProyecto.getLastSelectedPathComponent();
-        if (!(seleccionado instanceof DefaultMutableTreeNode nodo)) {
+    private void seleccionArbol(
+            TreeSelectionEvent evento
+    ) {
+        Object seleccionado =
+                arbolProyecto
+                        .getLastSelectedPathComponent();
+
+        if (!(seleccionado
+                instanceof DefaultMutableTreeNode nodo)) {
+
             return;
         }
-        if (!(nodo.getUserObject() instanceof Path ruta)) {
+
+        if (!(nodo.getUserObject()
+                instanceof Path ruta)) {
+
             return;
         }
-        if (Files.isRegularFile(ruta)) {
-            abrirArchivo(ruta);
+
+        if (Files.isRegularFile(
+                ruta
+        )) {
+            abrirArchivo(
+                    ruta
+            );
         }
     }
 
-    private void abrirArchivo(Path ruta) {
-        for (int indice = 0; indice < pestanas.getTabCount(); indice++) {
-            PanelEditor panel = (PanelEditor) pestanas.getComponentAt(indice);
-            if (panel.editor().ruta().equals(ruta)) {
-                pestanas.setSelectedIndex(indice);
+    private void abrirArchivo(
+            Path ruta
+    ) {
+        for (int indice = 0;
+             indice < pestanas.getTabCount();
+             indice++) {
+
+            PanelEditor panel =
+                    (PanelEditor)
+                            pestanas.getComponentAt(
+                                    indice
+                            );
+
+            if (panel.editor()
+                    .ruta()
+                    .equals(
+                            ruta
+                    )) {
+
+                pestanas.setSelectedIndex(
+                        indice
+                );
+
                 return;
             }
         }
 
         try {
-            LenguajeFuente lenguaje = LenguajeFuente.desdeRuta(ruta)
-                    .orElseThrow();
-            ArchivoFuente archivo = new ArchivoFuente(
-                    ruta,
-                    lenguaje,
-                    Files.readString(ruta, StandardCharsets.UTF_8)
+            LenguajeFuente lenguaje =
+                    LenguajeFuente.desdeRuta(
+                            ruta
+                    ).orElseThrow();
+
+            ArchivoFuente archivo =
+                    new ArchivoFuente(
+                            ruta,
+                            lenguaje,
+                            Files.readString(
+                                    ruta,
+                                    StandardCharsets.UTF_8
+                            )
+                    );
+
+            PanelEditor panel =
+                    new PanelEditor(
+                            archivo
+                    );
+
+            pestanas.addTab(
+                    archivo.nombre(),
+                    panel
             );
-            PanelEditor panel = new PanelEditor(archivo);
-            pestanas.addTab(archivo.nombre(), panel);
-            pestanas.setSelectedComponent(panel);
+
+            pestanas.setSelectedComponent(
+                    panel
+            );
+
         } catch (IOException excepcion) {
-            mostrarError("No se pudo abrir el archivo", excepcion);
+
+            mostrarError(
+                    "No se pudo abrir el archivo",
+                    excepcion
+            );
         }
     }
 
     private void guardarActivo() {
-        if (!(pestanas.getSelectedComponent() instanceof PanelEditor panel)) {
+        if (!(pestanas.getSelectedComponent()
+                instanceof PanelEditor panel)) {
+
             return;
         }
 
-        guardar(panel.editor());
+        guardar(
+                panel.editor()
+        );
     }
 
     private void guardarTodos() {
-        for (int indice = 0; indice < pestanas.getTabCount(); indice++) {
-            PanelEditor panel = (PanelEditor) pestanas.getComponentAt(indice);
-            if (panel.editor().modificado()) {
-                guardar(panel.editor());
+        for (int indice = 0;
+             indice < pestanas.getTabCount();
+             indice++) {
+
+            PanelEditor panel =
+                    (PanelEditor)
+                            pestanas.getComponentAt(
+                                    indice
+                            );
+
+            if (panel.editor()
+                    .modificado()) {
+
+                guardar(
+                        panel.editor()
+                );
             }
         }
     }
 
-    private void guardar(EditorCodigo editor) {
+    private void guardar(
+            EditorCodigo editor
+    ) {
         try {
-            gestorProyecto.guardar(editor.ruta(), editor.getText());
+            gestorProyecto.guardar(
+                    editor.ruta(),
+                    editor.getText()
+            );
+
             editor.marcarGuardado();
-            actualizarTituloPestana(editor);
-            estado.setText("Archivo guardado: " + editor.ruta().getFileName());
+
+            actualizarTituloPestana(
+                    editor
+            );
+
+            estado.setText(
+                    "Archivo guardado: "
+                            + editor.ruta()
+                            .getFileName()
+            );
+
         } catch (IOException excepcion) {
-            mostrarError("No se pudo guardar el archivo", excepcion);
+
+            mostrarError(
+                    "No se pudo guardar el archivo",
+                    excepcion
+            );
         }
     }
 
-    private void actualizarTituloPestana(EditorCodigo editor) {
-        for (int indice = 0; indice < pestanas.getTabCount(); indice++) {
-            PanelEditor panel = (PanelEditor) pestanas.getComponentAt(indice);
-            if (panel.editor() == editor) {
-                pestanas.setTitleAt(indice, editor.ruta().getFileName().toString());
+    private void actualizarTituloPestana(
+            EditorCodigo editor
+    ) {
+        for (int indice = 0;
+             indice < pestanas.getTabCount();
+             indice++) {
+
+            PanelEditor panel =
+                    (PanelEditor)
+                            pestanas.getComponentAt(
+                                    indice
+                            );
+
+            if (panel.editor()
+                    == editor) {
+
+                pestanas.setTitleAt(
+                        indice,
+                        editor.ruta()
+                                .getFileName()
+                                .toString()
+                );
+
                 return;
             }
         }
     }
 
+    private Path rutaSeleccionadaArbol() {
+        Object seleccionado =
+                arbolProyecto
+                        .getLastSelectedPathComponent();
+
+        if (!(seleccionado
+                instanceof DefaultMutableTreeNode nodo)) {
+
+            return null;
+        }
+
+        if (!(nodo.getUserObject()
+                instanceof Path ruta)) {
+
+            return null;
+        }
+
+        return ruta.toAbsolutePath()
+                .normalize();
+    }
+
+    private void descargarArchivoSeleccionado() {
+        Path origen =
+                rutaSeleccionadaArbol();
+
+        if (origen == null
+                || !Files.isRegularFile(
+                origen
+        )) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Seleccione un archivo en el arbol del proyecto",
+                    "Archivo no seleccionado",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            return;
+        }
+
+        JFileChooser selector =
+                new JFileChooser();
+
+        selector.setDialogTitle(
+                "Descargar archivo"
+        );
+
+        selector.setSelectedFile(
+                new java.io.File(
+                        origen.getFileName()
+                                .toString()
+                )
+        );
+
+        if (selector.showSaveDialog(
+                this
+        ) != JFileChooser.APPROVE_OPTION) {
+
+            return;
+        }
+
+        Path destino =
+                selector.getSelectedFile()
+                        .toPath()
+                        .toAbsolutePath()
+                        .normalize();
+
+        if (origen.equals(
+                destino
+        )) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "El destino debe ser diferente del archivo original",
+                    "Destino no valido",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            return;
+        }
+
+        if (!confirmarSobrescritura(
+                destino
+        )) {
+            return;
+        }
+
+        try {
+            Files.copy(
+                    origen,
+                    destino,
+                    StandardCopyOption.REPLACE_EXISTING
+            );
+
+            estado.setText(
+                    "Archivo descargado: "
+                            + destino
+            );
+
+        } catch (IOException excepcion) {
+
+            mostrarError(
+                    "No se pudo descargar el archivo",
+                    excepcion
+            );
+        }
+    }
+
+    private void descargarCarpetaSeleccionada() {
+        Path origen =
+                rutaSeleccionadaArbol();
+
+        if (origen == null
+                || !Files.isDirectory(
+                origen
+        )) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Seleccione una carpeta en el arbol del proyecto",
+                    "Carpeta no seleccionada",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            return;
+        }
+
+        JFileChooser selector =
+                new JFileChooser();
+
+        selector.setDialogTitle(
+                "Descargar carpeta"
+        );
+
+        selector.setSelectedFile(
+                new java.io.File(
+                        origen.getFileName()
+                                .toString()
+                                + ".zip"
+                )
+        );
+
+        if (selector.showSaveDialog(
+                this
+        ) != JFileChooser.APPROVE_OPTION) {
+
+            return;
+        }
+
+        Path destino =
+                selector.getSelectedFile()
+                        .toPath()
+                        .toAbsolutePath()
+                        .normalize();
+
+        if (!destino.getFileName()
+                .toString()
+                .toLowerCase()
+                .endsWith(
+                        ".zip"
+                )) {
+
+            destino =
+                    destino.resolveSibling(
+                            destino.getFileName()
+                                    .toString()
+                                    + ".zip"
+                    );
+        }
+
+        if (destino.startsWith(
+                origen
+        )) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Guarde el ZIP fuera de la carpeta que desea descargar",
+                    "Destino no valido",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            return;
+        }
+
+        if (!confirmarSobrescritura(
+                destino
+        )) {
+            return;
+        }
+
+        try {
+            crearZipCarpeta(
+                    origen,
+                    destino
+            );
+
+            estado.setText(
+                    "Carpeta descargada: "
+                            + destino
+            );
+
+        } catch (IOException excepcion) {
+
+            try {
+                Files.deleteIfExists(
+                        destino
+                );
+            } catch (IOException ignorada) {
+            }
+
+            mostrarError(
+                    "No se pudo descargar la carpeta",
+                    excepcion
+            );
+        }
+    }
+
+    private boolean confirmarSobrescritura(
+            Path destino
+    ) {
+        if (!Files.exists(
+                destino
+        )) {
+            return true;
+        }
+
+        int opcion =
+                JOptionPane.showConfirmDialog(
+                        this,
+                        "El archivo ya existe. Desea reemplazarlo?",
+                        "Confirmar reemplazo",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.WARNING_MESSAGE
+                );
+
+        return opcion
+                == JOptionPane.YES_OPTION;
+    }
+
+    private void crearZipCarpeta(
+            Path origen,
+            Path destino
+    ) throws IOException {
+
+        try (ZipOutputStream zip =
+                     new ZipOutputStream(
+                             Files.newOutputStream(
+                                     destino
+                             )
+                     );
+             var rutas =
+                     Files.walk(
+                             origen
+                     )) {
+
+            List<Path> elementos =
+                    rutas
+                            .filter(
+                                    ruta ->
+                                            !ruta.equals(
+                                                    origen
+                                            )
+                            )
+                            .filter(
+                                    ruta ->
+                                            incluirEnDescarga(
+                                                    origen,
+                                                    ruta
+                                            )
+                            )
+                            .sorted()
+                            .toList();
+
+            for (Path ruta : elementos) {
+                String nombre =
+                        origen.relativize(
+                                        ruta
+                                )
+                                .toString()
+                                .replace(
+                                        '\\',
+                                        '/'
+                                );
+
+                if (Files.isDirectory(
+                        ruta
+                )) {
+                    if (!nombre.endsWith(
+                            "/"
+                    )) {
+                        nombre +=
+                                "/";
+                    }
+
+                    zip.putNextEntry(
+                            new ZipEntry(
+                                    nombre
+                            )
+                    );
+
+                    zip.closeEntry();
+
+                    continue;
+                }
+
+                if (!Files.isRegularFile(
+                        ruta
+                )) {
+                    continue;
+                }
+
+                zip.putNextEntry(
+                        new ZipEntry(
+                                nombre
+                        )
+                );
+
+                Files.copy(
+                        ruta,
+                        zip
+                );
+
+                zip.closeEntry();
+            }
+        }
+    }
+
+    private boolean incluirEnDescarga(
+            Path origen,
+            Path ruta
+    ) {
+        Path relativa =
+                origen.relativize(
+                        ruta
+                );
+
+        for (Path parte : relativa) {
+            String nombre =
+                    parte.toString();
+
+            if (nombre.equals(
+                    "target"
+            )
+                    || nombre.equals(
+                    ".git"
+            )
+                    || nombre.equals(
+                    ".idea"
+            )) {
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private void analizarProyecto() {
         if (raizProyecto == null) {
+
             JOptionPane.showMessageDialog(
                     this,
                     "Primero debe abrir una carpeta de proyecto",
                     "Proyecto no seleccionado",
                     JOptionPane.INFORMATION_MESSAGE
             );
+
             return;
         }
 
         try {
             guardarTodos();
-            ProyectoCompilacion proyecto = gestorProyecto.abrir(raizProyecto);
-            ResultadoCompilacion resultado = compilador.compilar(proyecto);
-            modeloDiagnosticos.actualizar(resultado.diagnosticos());
 
-            String mensaje = resultado.esValido()
-                    ? "Analisis inicial completado sin errores"
-                    : "Analisis inicial completado con errores";
-            estado.setText(mensaje + " | Archivos: " + proyecto.archivos().size());
+            modeloDiagnosticos.actualizar(
+                    List.of()
+            );
+
+            panelCuartetas.limpiar();
+            panelMemoria.limpiar();
+            panelCodigoC3D.limpiar();
+            panelCodigoC.limpiar();
+
+            codigoCActual =
+                    "";
+
+            actualizarTitulosResultados();
+
+            ProyectoCompilacion proyecto =
+                    gestorProyecto.abrir(
+                            raizProyecto
+                    );
+
+            ResultadoCompilacion resultado =
+                    compilador.compilar(
+                            proyecto
+                    );
+
+            modeloDiagnosticos.actualizar(
+                    resultado.diagnosticos()
+            );
+
+            if (!resultado.esValido()) {
+                actualizarTitulosResultados();
+
+                pestanasResultados.setSelectedIndex(
+                        0
+                );
+
+                estado.setText(
+                        "Analisis completado con errores"
+                                + " | Archivos: "
+                                + proyecto.archivos()
+                                .size()
+                                + " | Diagnosticos: "
+                                + resultado.diagnosticos()
+                                .size()
+                                + " | Cuartetas: 0"
+                                + " | Memoria: 0"
+                );
+
+                return;
+            }
+
+            panelCuartetas.mostrar(
+                    resultado.programaIntermedio()
+            );
+
+            panelMemoria.mostrar(
+                    resultado.programaMemoria()
+            );
+
+            String codigoC3D =
+                    new GeneradorCodigoTresDirecciones()
+                            .generar(
+                                    resultado.programaMemoria()
+                            );
+
+            panelCodigoC3D.mostrar(
+                    codigoC3D
+            );
+
+            codigoCActual =
+                    new GeneradorCodigoC()
+                            .generar(
+                                    resultado.programaMemoria()
+                            );
+
+            panelCodigoC.mostrar(
+                    codigoCActual
+            );
+
+            actualizarTitulosResultados();
+
+            pestanasResultados.setSelectedIndex(
+                    4
+            );
+
+            estado.setText(
+                    "Analisis completado sin errores"
+                            + " | Archivos: "
+                            + proyecto.archivos()
+                            .size()
+                            + " | Diagnosticos: "
+                            + resultado.diagnosticos()
+                            .size()
+                            + " | Cuartetas: "
+                            + panelCuartetas.modelo()
+                            .getRowCount()
+                            + " | Memoria: "
+                            + panelMemoria.modelo()
+                            .getRowCount()
+            );
+
         } catch (IOException | RuntimeException excepcion) {
-            mostrarError("No se pudo analizar el proyecto", excepcion);
+
+            panelCuartetas.limpiar();
+            panelMemoria.limpiar();
+            panelCodigoC3D.limpiar();
+            panelCodigoC.limpiar();
+
+            codigoCActual =
+                    "";
+
+            actualizarTitulosResultados();
+
+            mostrarError(
+                    "No se pudo analizar el proyecto",
+                    excepcion
+            );
         }
     }
 
+    private void actualizarTitulosResultados() {
+        pestanasResultados.setTitleAt(
+                0,
+                "Diagnosticos ("
+                        + modeloDiagnosticos
+                        .getRowCount()
+                        + ")"
+        );
+
+        pestanasResultados.setTitleAt(
+                1,
+                "Cuartetas ("
+                        + panelCuartetas.modelo()
+                        .getRowCount()
+                        + ")"
+        );
+
+        pestanasResultados.setTitleAt(
+                2,
+                "Memoria / C3D ("
+                        + panelMemoria.modelo()
+                        .getRowCount()
+                        + ")"
+        );
+        pestanasResultados.setTitleAt(
+                3,
+                "Codigo C3D"
+        );
+
+        pestanasResultados.setTitleAt(
+                4,
+                "Codigo C"
+        );
+    }
+
     private void intentarCerrar() {
-        List<EditorCodigo> modificados = new ArrayList<>();
-        for (int indice = 0; indice < pestanas.getTabCount(); indice++) {
-            PanelEditor panel = (PanelEditor) pestanas.getComponentAt(indice);
-            if (panel.editor().modificado()) {
-                modificados.add(panel.editor());
+        List<EditorCodigo> modificados =
+                new ArrayList<>();
+
+        for (int indice = 0;
+             indice < pestanas.getTabCount();
+             indice++) {
+
+            PanelEditor panel =
+                    (PanelEditor)
+                            pestanas.getComponentAt(
+                                    indice
+                            );
+
+            if (panel.editor()
+                    .modificado()) {
+
+                modificados.add(
+                        panel.editor()
+                );
             }
         }
 
         if (!modificados.isEmpty()) {
-            int opcion = JOptionPane.showConfirmDialog(
-                    this,
-                    "Hay archivos sin guardar. Desea guardarlos antes de salir?",
-                    "Cambios pendientes",
-                    JOptionPane.YES_NO_CANCEL_OPTION,
-                    JOptionPane.WARNING_MESSAGE
-            );
 
-            if (opcion == JOptionPane.CANCEL_OPTION
-                    || opcion == JOptionPane.CLOSED_OPTION) {
+            int opcion =
+                    JOptionPane.showConfirmDialog(
+                            this,
+                            "Hay archivos sin guardar. Desea guardarlos antes de salir?",
+                            "Cambios pendientes",
+                            JOptionPane.YES_NO_CANCEL_OPTION,
+                            JOptionPane.WARNING_MESSAGE
+                    );
+
+            if (opcion
+                    == JOptionPane.CANCEL_OPTION
+                    || opcion
+                    == JOptionPane.CLOSED_OPTION) {
+
                 return;
             }
-            if (opcion == JOptionPane.YES_OPTION) {
+
+            if (opcion
+                    == JOptionPane.YES_OPTION) {
+
                 guardarTodos();
             }
         }
@@ -365,12 +1423,89 @@ public final class VentanaPrincipal extends JFrame {
         dispose();
     }
 
-    private void mostrarError(String mensaje, Exception excepcion) {
+    private void mostrarError(
+            String mensaje,
+            Exception excepcion
+    ) {
         JOptionPane.showMessageDialog(
                 this,
-                mensaje + ": " + excepcion.getMessage(),
+                mensaje
+                        + ": "
+                        + excepcion.getMessage(),
                 "Error",
                 JOptionPane.ERROR_MESSAGE
         );
+    }
+
+    private void guardarCodigoC() {
+        if (codigoCActual == null
+                || codigoCActual.isBlank()) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Primero debe analizar correctamente el proyecto",
+                    "Codigo C no disponible",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            return;
+        }
+
+        JFileChooser selector =
+                new JFileChooser();
+
+        selector.setDialogTitle(
+                "Guardar codigo C"
+        );
+
+        selector.setSelectedFile(
+                new java.io.File(
+                        "programa.c"
+                )
+        );
+
+        if (selector.showSaveDialog(
+                this
+        ) != JFileChooser.APPROVE_OPTION) {
+
+            return;
+        }
+
+        Path destino =
+                selector.getSelectedFile()
+                        .toPath();
+
+        if (!destino.getFileName()
+                .toString()
+                .toLowerCase()
+                .endsWith(".c")) {
+
+            destino =
+                    destino.resolveSibling(
+                            destino.getFileName()
+                                    .toString()
+                                    + ".c"
+                    );
+        }
+
+        try {
+            Files.writeString(
+                    destino,
+                    codigoCActual,
+                    StandardCharsets.UTF_8
+            );
+
+            estado.setText(
+                    "Codigo C guardado: "
+                            + destino
+            );
+
+        } catch (IOException excepcion) {
+
+            mostrarError(
+                    "No se pudo guardar el codigo C",
+                    excepcion
+            );
+        }
     }
 }
