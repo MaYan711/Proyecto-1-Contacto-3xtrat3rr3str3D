@@ -7,6 +7,8 @@ import com.compi2.contacto.ir.ProgramaIntermedio;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class BajadorMemoriaProyecto {
 
@@ -643,32 +645,57 @@ public final class BajadorMemoriaProyecto {
     private Optional<String> direccionMiembro(
             String expresion
     ) {
-        Optional<DireccionMiembro> direccion =
+        Optional<RutaMiembro> ruta =
                 analizarMiembro(
                         expresion
                 );
 
-        if (direccion.isEmpty()) {
+        if (ruta.isEmpty()) {
             return Optional.empty();
         }
 
-        DireccionMiembro miembro =
-                direccion.orElseThrow();
+        RutaMiembro resuelta =
+                ruta.orElseThrow();
 
         String referencia =
                 leerStack(
-                        miembro.slot()
+                        resuelta.slotBase()
+                );
+
+        List<LayoutHeapProyecto.Campo> campos =
+                resuelta.campos();
+
+        for (int indice = 0;
+             indice < campos.size() - 1;
+             indice++) {
+
+            LayoutHeapProyecto.Campo campo =
+                    campos.get(
+                            indice
+                    );
+
+            referencia =
+                    leerHeap(
+                            referencia
+                                    + "+"
+                                    + campo.desplazamiento(),
+                            campo.tipo()
+                    );
+        }
+
+        LayoutHeapProyecto.Campo ultimo =
+                campos.get(
+                        campos.size() - 1
                 );
 
         return Optional.of(
                 referencia
                         + "+"
-                        + miembro.campo()
-                        .desplazamiento()
+                        + ultimo.desplazamiento()
         );
     }
 
-    private Optional<DireccionMiembro> direccionMiembroSinEmitir(
+    private Optional<RutaMiembro> direccionMiembroSinEmitir(
             String expresion
     ) {
         return analizarMiembro(
@@ -676,7 +703,7 @@ public final class BajadorMemoriaProyecto {
         );
     }
 
-    private Optional<DireccionMiembro> analizarMiembro(
+    private Optional<RutaMiembro> analizarMiembro(
             String expresion
     ) {
         if (marcoActual == null
@@ -689,60 +716,134 @@ public final class BajadorMemoriaProyecto {
             return Optional.empty();
         }
 
-        int punto =
-                expresion.indexOf('.');
+        String[] partes =
+                expresion.split(
+                        "\\."
+                );
 
-        if (punto <= 0
-                || punto != expresion.lastIndexOf('.')
-                || punto >= expresion.length() - 1) {
-
+        if (partes.length < 2) {
             return Optional.empty();
         }
 
-        String base =
-                expresion.substring(
-                        0,
-                        punto
-                );
+        for (String parte : partes) {
+            if (parte == null
+                    || parte.isBlank()) {
 
-        String campoNombre =
-                expresion.substring(
-                        punto + 1
-                );
+                return Optional.empty();
+            }
+        }
+
+        SlotStackProyecto slotBase;
+        String tipoActual;
+        int indiceInicial;
+
+        List<LayoutHeapProyecto.Campo> campos =
+                new ArrayList<>();
 
         Optional<SlotStackProyecto> slot =
                 marcoActual.buscar(
-                        base
+                        partes[0]
                 );
 
-        if (slot.isEmpty()) {
-            return Optional.empty();
+        if (slot.isPresent()) {
+            slotBase =
+                    slot.orElseThrow();
+
+            tipoActual =
+                    slotBase.tipo();
+
+            indiceInicial = 1;
+
+        } else {
+            if (claseZActual == null) {
+                return Optional.empty();
+            }
+
+            Optional<SlotStackProyecto> thisSlot =
+                    marcoActual.thisSlot();
+
+            Optional<LayoutHeapProyecto> layoutActual =
+                    plan.layout(
+                            "Z::"
+                                    + claseZActual
+                    );
+
+            if (thisSlot.isEmpty()
+                    || layoutActual.isEmpty()) {
+
+                return Optional.empty();
+            }
+
+            Optional<LayoutHeapProyecto.Campo> campoInicial =
+                    layoutActual.orElseThrow()
+                            .buscarCampo(
+                                    partes[0]
+                            );
+
+            if (campoInicial.isEmpty()) {
+                return Optional.empty();
+            }
+
+            slotBase =
+                    thisSlot.orElseThrow();
+
+            LayoutHeapProyecto.Campo primero =
+                    campoInicial.orElseThrow();
+
+            campos.add(
+                    primero
+            );
+
+            tipoActual =
+                    primero.tipo();
+
+            indiceInicial = 1;
         }
 
-        Optional<LayoutHeapProyecto> layout =
-                buscarLayoutTipo(
-                        slot.orElseThrow()
-                                .tipo()
-                );
+        for (int indice = indiceInicial;
+             indice < partes.length;
+             indice++) {
 
-        if (layout.isEmpty()) {
-            return Optional.empty();
+            Optional<LayoutHeapProyecto> layout =
+                    buscarLayoutTipo(
+                            tipoActual
+                    );
+
+            if (layout.isEmpty()) {
+                return Optional.empty();
+            }
+
+            Optional<LayoutHeapProyecto.Campo> campo =
+                    layout.orElseThrow()
+                            .buscarCampo(
+                                    partes[indice]
+                            );
+
+            if (campo.isEmpty()) {
+                return Optional.empty();
+            }
+
+            LayoutHeapProyecto.Campo encontrado =
+                    campo.orElseThrow();
+
+            campos.add(
+                    encontrado
+            );
+
+            tipoActual =
+                    encontrado.tipo();
         }
 
-        Optional<LayoutHeapProyecto.Campo> campo =
-                layout.orElseThrow()
-                        .buscarCampo(
-                                campoNombre
-                        );
-
-        if (campo.isEmpty()) {
+        if (campos.isEmpty()) {
             return Optional.empty();
         }
 
         return Optional.of(
-                new DireccionMiembro(
-                        slot.orElseThrow(),
-                        campo.orElseThrow()
+                new RutaMiembro(
+                        slotBase,
+                        List.copyOf(
+                                campos
+                        )
                 )
         );
     }
@@ -784,8 +885,12 @@ public final class BajadorMemoriaProyecto {
         return analizarMiembro(
                 expresion
         ).map(
-                direccion ->
-                        direccion.campo()
+                ruta ->
+                        ruta.campos()
+                                .get(
+                                        ruta.campos()
+                                                .size() - 1
+                                )
                                 .tipo()
         );
     }
@@ -996,9 +1101,10 @@ public final class BajadorMemoriaProyecto {
         );
     }
 
-    private record DireccionMiembro(
-            SlotStackProyecto slot,
-            LayoutHeapProyecto.Campo campo
+    private record RutaMiembro(
+            SlotStackProyecto slotBase,
+            List<LayoutHeapProyecto.Campo> campos
     ) {
     }
 }
+
