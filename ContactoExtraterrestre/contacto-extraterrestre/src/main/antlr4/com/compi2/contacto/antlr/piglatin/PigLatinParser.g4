@@ -84,7 +84,8 @@ sentenciaExpresion
     ;
 
 sentenciaEntrada
-    : LEER accesoAsignable PUNTO_COMA?
+    : accesoAsignable LEER PUNTO_COMA?
+    | LEER accesoAsignable? PUNTO_COMA?
     ;
 
 sentenciaSalida

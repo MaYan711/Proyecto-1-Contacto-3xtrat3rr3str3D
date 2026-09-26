@@ -21,6 +21,9 @@ public final class GeneradorCodigoC {
                     "\\b(?:y_t|z_t|pig_t|mem_t|call_t|obj_t|str_t|str_h|arr_t|init_h)\\d+\\b"
             );
 
+    private static final String MARCA_CADENA =
+            "@STR@";
+
     public String generar(
             ProgramaIntermedio programa
     ) {
@@ -155,7 +158,11 @@ public final class GeneradorCodigoC {
         );
 
         codigo.append(
-                "#include <stdbool.h>\n\n"
+                "#include <stdbool.h>\n"
+        );
+
+        codigo.append(
+                "#include <string.h>\n\n"
         );
 
         codigo.append(
@@ -223,19 +230,35 @@ public final class GeneradorCodigoC {
         );
 
         codigo.append(
-                "static double runtime_read_number(void) {\n"
+                "static void runtime_append_string(double referencia) {\n"
         );
 
         codigo.append(
-                "    double valor = 0;\n"
+                "    int posicion = (int) referencia;\n"
         );
 
         codigo.append(
-                "    if (scanf(\"%lf\", &valor) != 1) {\n"
+                "    if (posicion < 0) {\n"
         );
 
         codigo.append(
-                "        return 0;\n"
+                "        const char *texto = \"null\";\n"
+        );
+
+        codigo.append(
+                "        for (int i = 0; texto[i] != '\\0'; i++) {\n"
+        );
+
+        codigo.append(
+                "            if (H < HEAP_SIZE) Heap[H++] = (unsigned char) texto[i];\n"
+        );
+
+        codigo.append(
+                "        }\n"
+        );
+
+        codigo.append(
+                "        return;\n"
         );
 
         codigo.append(
@@ -243,7 +266,319 @@ public final class GeneradorCodigoC {
         );
 
         codigo.append(
+                "    while (posicion >= 0 && posicion < HEAP_SIZE && Heap[posicion] != -1) {\n"
+        );
+
+        codigo.append(
+                "        if (H < HEAP_SIZE) Heap[H++] = Heap[posicion];\n"
+        );
+
+        codigo.append(
+                "        posicion++;\n"
+        );
+
+        codigo.append(
+                "    }\n"
+        );
+
+        codigo.append(
+                "}\n\n"
+        );
+
+        codigo.append(
+                "static void runtime_append_number(double valor) {\n"
+        );
+
+        codigo.append(
+                "    char buffer[128];\n"
+        );
+
+        codigo.append(
+                "    int cantidad = snprintf(buffer, sizeof(buffer), \"%.15g\", valor);\n"
+        );
+
+        codigo.append(
+                "    if (cantidad < 0) return;\n"
+        );
+
+        codigo.append(
+                "    for (int i = 0; i < cantidad && i < (int) sizeof(buffer); i++) {\n"
+        );
+
+        codigo.append(
+                "        if (H < HEAP_SIZE) Heap[H++] = (unsigned char) buffer[i];\n"
+        );
+
+        codigo.append(
+                "    }\n"
+        );
+
+        codigo.append(
+                "}\n\n"
+        );
+
+        codigo.append(
+                "static double runtime_concat_string_string(double izquierda, double derecha) {\n"
+        );
+
+        codigo.append(
+                "    double inicio = H;\n"
+        );
+
+        codigo.append(
+                "    runtime_append_string(izquierda);\n"
+        );
+
+        codigo.append(
+                "    runtime_append_string(derecha);\n"
+        );
+
+        codigo.append(
+                "    if (H < HEAP_SIZE) Heap[H++] = -1;\n"
+        );
+
+        codigo.append(
+                "    return inicio;\n"
+        );
+
+        codigo.append(
+                "}\n\n"
+        );
+
+        codigo.append(
+                "static double runtime_concat_string_number(double izquierda, double derecha) {\n"
+        );
+
+        codigo.append(
+                "    double inicio = H;\n"
+        );
+
+        codigo.append(
+                "    runtime_append_string(izquierda);\n"
+        );
+
+        codigo.append(
+                "    runtime_append_number(derecha);\n"
+        );
+
+        codigo.append(
+                "    if (H < HEAP_SIZE) Heap[H++] = -1;\n"
+        );
+
+        codigo.append(
+                "    return inicio;\n"
+        );
+
+        codigo.append(
+                "}\n\n"
+        );
+
+        codigo.append(
+                "static double runtime_concat_number_string(double izquierda, double derecha) {\n"
+        );
+
+        codigo.append(
+                "    double inicio = H;\n"
+        );
+
+        codigo.append(
+                "    runtime_append_number(izquierda);\n"
+        );
+
+        codigo.append(
+                "    runtime_append_string(derecha);\n"
+        );
+
+        codigo.append(
+                "    if (H < HEAP_SIZE) Heap[H++] = -1;\n"
+        );
+
+        codigo.append(
+                "    return inicio;\n"
+        );
+
+        codigo.append(
+                "}\n\n"
+        );
+
+        codigo.append(
+                "static int runtime_read_line(char *buffer, int capacidad) {\n"
+        );
+
+        codigo.append(
+                "    if (buffer == NULL || capacidad <= 0) return 0;\n"
+        );
+
+        codigo.append(
+                "    fflush(stdout);\n"
+        );
+
+        codigo.append(
+                "    if (fgets(buffer, capacidad, stdin) == NULL) return 0;\n"
+        );
+
+        codigo.append(
+                "    int longitud = (int) strlen(buffer);\n"
+        );
+
+        codigo.append(
+                "    while (longitud > 0 && (buffer[longitud - 1] == '\\n' || buffer[longitud - 1] == '\\r')) {\n"
+        );
+
+        codigo.append(
+                "        buffer[--longitud] = '\\0';\n"
+        );
+
+        codigo.append(
+                "    }\n"
+        );
+
+        codigo.append(
+                "    return 1;\n"
+        );
+
+        codigo.append(
+                "}\n\n"
+        );
+
+        codigo.append(
+                "static double runtime_read_number(void) {\n"
+        );
+
+        codigo.append(
+                "    char buffer[4096];\n"
+        );
+
+        codigo.append(
+                "    if (!runtime_read_line(buffer, sizeof(buffer))) return 0;\n"
+        );
+
+        codigo.append(
+                "    char *fin = NULL;\n"
+        );
+
+        codigo.append(
+                "    double valor = strtod(buffer, &fin);\n"
+        );
+
+        codigo.append(
+                "    if (fin == buffer) return 0;\n"
+        );
+
+        codigo.append(
                 "    return valor;\n"
+        );
+
+        codigo.append(
+                "}\n\n"
+        );
+
+        codigo.append(
+                "static double runtime_read_string(void) {\n"
+        );
+
+        codigo.append(
+                "    char buffer[4096];\n"
+        );
+
+        codigo.append(
+                "    if (!runtime_read_line(buffer, sizeof(buffer))) return -1;\n"
+        );
+
+        codigo.append(
+                "    double inicio = H;\n"
+        );
+
+        codigo.append(
+                "    for (int i = 0; buffer[i] != '\\0'; i++) {\n"
+        );
+
+        codigo.append(
+                "        if (H >= HEAP_SIZE - 1) break;\n"
+        );
+
+        codigo.append(
+                "        Heap[H++] = (unsigned char) buffer[i];\n"
+        );
+
+        codigo.append(
+                "    }\n"
+        );
+
+        codigo.append(
+                "    if (H < HEAP_SIZE) Heap[H++] = -1;\n"
+        );
+
+        codigo.append(
+                "    return inicio;\n"
+        );
+
+        codigo.append(
+                "}\n\n"
+        );
+
+        codigo.append(
+                "static double runtime_read_char(void) {\n"
+        );
+
+        codigo.append(
+                "    char buffer[4096];\n"
+        );
+
+        codigo.append(
+                "    if (!runtime_read_line(buffer, sizeof(buffer))) return 0;\n"
+        );
+
+        codigo.append(
+                "    if (buffer[0] == '\\0') return 0;\n"
+        );
+
+        codigo.append(
+                "    return (unsigned char) buffer[0];\n"
+        );
+
+        codigo.append(
+                "}\n\n"
+        );
+
+        codigo.append(
+                "static double runtime_read_boolean(void) {\n"
+        );
+
+        codigo.append(
+                "    char buffer[4096];\n"
+        );
+
+        codigo.append(
+                "    if (!runtime_read_line(buffer, sizeof(buffer))) return 0;\n"
+        );
+
+        codigo.append(
+                "    if (strcmp(buffer, \"1\") == 0 || strcmp(buffer, \"true\") == 0 || strcmp(buffer, \"verum\") == 0) return 1;\n"
+        );
+
+        codigo.append(
+                "    if (strcmp(buffer, \"0\") == 0 || strcmp(buffer, \"false\") == 0 || strcmp(buffer, \"falsus\") == 0) return 0;\n"
+        );
+
+        codigo.append(
+                "    return strtod(buffer, NULL) != 0 ? 1 : 0;\n"
+        );
+
+        codigo.append(
+                "}\n\n"
+        );
+
+        codigo.append(
+                "static void runtime_discard_input(void) {\n"
+        );
+
+        codigo.append(
+                "    char buffer[4096];\n"
+        );
+
+        codigo.append(
+                "    runtime_read_line(buffer, sizeof(buffer));\n"
         );
 
         codigo.append(
@@ -322,13 +657,21 @@ public final class GeneradorCodigoC {
             );
         }
 
-        for (Cuarteta cuarteta
-                : cuartetas) {
+        for (int indice = 0;
+             indice < cuartetas.size();
+             indice++) {
+
+            Cuarteta cuarteta =
+                    cuartetas.get(
+                            indice
+                    );
 
             generarCuarteta(
                     codigo,
                     cuarteta,
-                    nombres
+                    nombres,
+                    nombre,
+                    indice + 1
             );
         }
 
@@ -389,7 +732,9 @@ public final class GeneradorCodigoC {
     private void generarCuarteta(
             StringBuilder codigo,
             Cuarteta cuarteta,
-            Map<String, String> nombres
+            Map<String, String> nombres,
+            String funcionActual,
+            int indiceCuarteta
     ) {
         switch (cuarteta.operador()) {
 
@@ -596,6 +941,22 @@ public final class GeneradorCodigoC {
                             "La operacion "
                                     + cuarteta.operador()
                                     + " llego sin bajar al generador C"
+                                    + " | funcion="
+                                    + funcionActual
+                                    + " | cuarteta="
+                                    + indiceCuarteta
+                                    + " | arg1="
+                                    + textoDiagnostico(
+                                    cuarteta.argumento1()
+                            )
+                                    + " | arg2="
+                                    + textoDiagnostico(
+                                    cuarteta.argumento2()
+                            )
+                                    + " | resultado="
+                                    + textoDiagnostico(
+                                    cuarteta.resultado()
+                            )
                     );
 
             case INICIO_FUNCION,
@@ -648,6 +1009,72 @@ public final class GeneradorCodigoC {
             Cuarteta cuarteta,
             String operador
     ) {
+        boolean izquierdaCadena =
+                esMarcadoCadena(
+                        cuarteta.argumento1()
+                );
+
+        boolean derechaCadena =
+                esMarcadoCadena(
+                        cuarteta.argumento2()
+                );
+
+        if ("+".equals(
+                operador
+        )
+                && (
+                izquierdaCadena
+                        || derechaCadena
+        )) {
+
+            String izquierda =
+                    expresion(
+                            quitarMarcaCadena(
+                                    cuarteta.argumento1()
+                            )
+                    );
+
+            String derecha =
+                    expresion(
+                            quitarMarcaCadena(
+                                    cuarteta.argumento2()
+                            )
+                    );
+
+            String funcion;
+
+            if (izquierdaCadena
+                    && derechaCadena) {
+
+                funcion =
+                        "runtime_concat_string_string";
+
+            } else if (izquierdaCadena) {
+
+                funcion =
+                        "runtime_concat_string_number";
+
+            } else {
+
+                funcion =
+                        "runtime_concat_number_string";
+            }
+
+            linea(
+                    codigo,
+                    cuarteta.resultado()
+                            + " = "
+                            + funcion
+                            + "("
+                            + izquierda
+                            + ", "
+                            + derecha
+                            + ");"
+            );
+
+            return;
+        }
+
         linea(
                 codigo,
                 cuarteta.resultado()
@@ -828,16 +1255,92 @@ public final class GeneradorCodigoC {
             StringBuilder codigo,
             Cuarteta cuarteta
     ) {
+        String tipo =
+                cuarteta.argumento1() == null
+                        ? ""
+                        : cuarteta.argumento1()
+                        .trim();
+
+        if (tipo.equalsIgnoreCase(
+                "descartar"
+        )) {
+
+            linea(
+                    codigo,
+                    "runtime_discard_input();"
+            );
+
+            return;
+        }
+
         if (vacio(
                 cuarteta.resultado()
         )) {
             return;
         }
 
+        String funcion;
+
+        if (esTipoCadena(
+                tipo
+        )) {
+
+            funcion =
+                    "runtime_read_string()";
+
+        } else if (tipo.equalsIgnoreCase(
+                "char"
+        )
+                || tipo.equalsIgnoreCase(
+                "caracter"
+        )
+                || tipo.equalsIgnoreCase(
+                "littera"
+        )) {
+
+            funcion =
+                    "runtime_read_char()";
+
+        } else if (tipo.equalsIgnoreCase(
+                "boolean"
+        )
+                || tipo.equalsIgnoreCase(
+                "bool"
+        )) {
+
+            funcion =
+                    "runtime_read_boolean()";
+
+        } else {
+
+            funcion =
+                    "runtime_read_number()";
+        }
+
         linea(
                 codigo,
                 cuarteta.resultado()
-                        + " = runtime_read_number();"
+                        + " = "
+                        + funcion
+                        + ";"
+        );
+    }
+
+    private boolean esTipoCadena(
+            String tipo
+    ) {
+        if (tipo == null) {
+            return false;
+        }
+
+        return tipo.equalsIgnoreCase(
+                "String"
+        )
+                || tipo.equalsIgnoreCase(
+                "cadena"
+        )
+                || tipo.equalsIgnoreCase(
+                "textum"
         );
     }
 
@@ -911,19 +1414,41 @@ public final class GeneradorCodigoC {
             StringBuilder codigo,
             Cuarteta cuarteta
     ) {
-        String valor =
-                expresion(
+        boolean referenciaCadena =
+                pareceReferenciaCadena(
                         cuarteta.argumento1()
                 );
 
-        boolean salto =
-                "println".equalsIgnoreCase(
-                        cuarteta.argumento2()
+        String valor =
+                expresion(
+                        quitarMarcaCadena(
+                                cuarteta.argumento1()
+                        )
                 );
 
-        if (pareceReferenciaCadena(
-                cuarteta.argumento1()
-        )) {
+        String modo =
+                cuarteta.argumento2() == null
+                        ? ""
+                        : cuarteta.argumento2()
+                        .trim()
+                        .toLowerCase();
+
+        boolean salto =
+                modo.startsWith(
+                        "println"
+                );
+
+        boolean caracter =
+                modo.endsWith(
+                        ":char"
+                );
+
+        boolean booleano =
+                modo.endsWith(
+                        ":boolean"
+                );
+
+        if (referenciaCadena) {
 
             linea(
                     codigo,
@@ -941,12 +1466,30 @@ public final class GeneradorCodigoC {
             return;
         }
 
-        linea(
-                codigo,
-                "printf(\"%.15g\", (double) ("
-                        + valor
-                        + "));"
-        );
+        if (caracter) {
+            linea(
+                    codigo,
+                    "putchar((unsigned char) ((int) ("
+                            + valor
+                            + ")));"
+            );
+
+        } else if (booleano) {
+            linea(
+                    codigo,
+                    "printf(\"%s\", (("
+                            + valor
+                            + ") != 0) ? \"true\" : \"false\");"
+            );
+
+        } else {
+            linea(
+                    codigo,
+                    "printf(\"%.15g\", (double) ("
+                            + valor
+                            + "));"
+            );
+        }
 
         if (salto) {
 
@@ -964,14 +1507,47 @@ public final class GeneradorCodigoC {
             return false;
         }
 
-        return valor.matches(
+        return esMarcadoCadena(
+                valor
+        )
+                || quitarMarcaCadena(
+                valor
+        ).matches(
                 "str_t\\d+"
+        );
+    }
+
+    private boolean esMarcadoCadena(
+            String valor
+    ) {
+        return valor != null
+                && valor.startsWith(
+                MARCA_CADENA
+        );
+    }
+
+    private String quitarMarcaCadena(
+            String valor
+    ) {
+        if (!esMarcadoCadena(
+                valor
+        )) {
+            return valor;
+        }
+
+        return valor.substring(
+                MARCA_CADENA.length()
         );
     }
 
     private String expresion(
             String valor
     ) {
+        valor =
+                quitarMarcaCadena(
+                        valor
+                );
+
         if (valor == null
                 || valor.isBlank()
                 || valor.equals("-")) {
@@ -1157,6 +1733,14 @@ public final class GeneradorCodigoC {
         codigo.append(
                 "\n"
         );
+    }
+
+    private String textoDiagnostico(
+            String valor
+    ) {
+        return valor == null
+                ? "<null>"
+                : valor;
     }
 
     private boolean vacio(

@@ -254,7 +254,7 @@ public final class GeneradorCuartetasY {
             agregar(
                     OperadorCuarteta.IMPRIMIR,
                     valor,
-                    null,
+                    "println",
                     null
             );
 
@@ -286,6 +286,15 @@ public final class GeneradorCuartetasY {
         );
 
         if (declaracion.inicializador().isEmpty()) {
+            if (!declaracion.dimensiones().isEmpty()) {
+                agregar(
+                        OperadorCuarteta.NUEVO_ARREGLO,
+                        declaracion.tipo().nombre(),
+                        dimensiones,
+                        declaracion.nombre()
+                );
+            }
+
             return;
         }
 
@@ -296,10 +305,18 @@ public final class GeneradorCuartetasY {
         if (inicializador
                 instanceof InicializadorListaAst lista) {
 
+            String tipoCompuesto =
+                    declaracion.tipo()
+                            .nombre()
+                            + "[]".repeat(
+                            declaracion.dimensiones()
+                                    .size()
+                    );
+
             agregar(
                     OperadorCuarteta.INICIALIZAR_COMPUESTO,
                     serializarLista(lista),
-                    null,
+                    tipoCompuesto,
                     declaracion.nombre()
             );
 
@@ -800,7 +817,7 @@ public final class GeneradorCuartetasY {
 
             agregar(
                     OperadorCuarteta.LEER,
-                    null,
+                    "cadena",
                     null,
                     temporal
             );

@@ -64,7 +64,7 @@ IDENTIFICADOR: [a-zA-Z_] [a-zA-Z0-9_]*;
 
 COMENTARIO_LINEA : '//' ~[\r\n]* -> channel(HIDDEN);
 COMENTARIO_BLOQUE: '/*' .*? '*/' -> channel(HIDDEN);
+COMENTARIO_HASH  : '##' .*? '##' -> channel(HIDDEN);
 ESPACIO          : [ \t\r\n]+ -> channel(HIDDEN);
 
 fragment ESCAPE: '\\' .;
-

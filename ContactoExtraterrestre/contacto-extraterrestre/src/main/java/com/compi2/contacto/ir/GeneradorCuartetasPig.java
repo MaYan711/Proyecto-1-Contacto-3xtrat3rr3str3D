@@ -257,6 +257,18 @@ public final class GeneradorCuartetasPig {
         if (declaracion.inicializador()
                 .isEmpty()) {
 
+            if (!declaracion.dimensiones()
+                    .isEmpty()) {
+
+                agregar(
+                        OperadorCuarteta.NUEVO_ARREGLO,
+                        declaracion.tipo()
+                                .nombreBase(),
+                        dimensiones,
+                        declaracion.nombre()
+                );
+            }
+
             return;
         }
 
@@ -272,7 +284,8 @@ public final class GeneradorCuartetasPig {
                     serializarLista(
                             lista
                     ),
-                    null,
+                    declaracion.tipo()
+                            .nombreCompleto(),
                     declaracion.nombre()
             );
 
@@ -295,12 +308,32 @@ public final class GeneradorCuartetasPig {
     private void generarEntrada(
             PAst.Entrada entrada
     ) {
+        if (entrada.destino()
+                .isEmpty()) {
+
+            agregar(
+                    OperadorCuarteta.LEER,
+                    "descartar",
+                    null,
+                    null
+            );
+
+            return;
+        }
+
+        String tipo =
+                enlaces.buscarTipoEntrada(
+                        entrada
+                ).orElse(
+                        "numerus"
+                );
+
         String temporal =
                 programa.nuevoTemporal();
 
         agregar(
                 OperadorCuarteta.LEER,
-                null,
+                tipo,
                 null,
                 temporal
         );
@@ -308,6 +341,7 @@ public final class GeneradorCuartetasPig {
         String destino =
                 generarLugar(
                         entrada.destino()
+                                .orElseThrow()
                 );
 
         agregar(

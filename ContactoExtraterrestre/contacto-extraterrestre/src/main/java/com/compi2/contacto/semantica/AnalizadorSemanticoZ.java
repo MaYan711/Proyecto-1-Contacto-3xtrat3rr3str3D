@@ -21,6 +21,7 @@ public final class AnalizadorSemanticoZ {
     private final List<Diagnostico> diagnosticos;
 
     private final Map<String, ClaseInfo> clases;
+    private final EnlacesZ enlaces;
 
     private ClaseInfo claseActual;
     private TipoZ retornoActual;
@@ -35,6 +36,7 @@ public final class AnalizadorSemanticoZ {
         tabla = new TablaSimbolos();
         diagnosticos = new ArrayList<>();
         clases = new LinkedHashMap<>();
+        enlaces = new EnlacesZ();
 
         retornoActual = TipoZ.voidTipo();
     }
@@ -60,9 +62,10 @@ public final class AnalizadorSemanticoZ {
         );
     }
 
-    // =========================================================
-    // PRIMERA PASADA: CLASES
-    // =========================================================
+    public EnlacesZ enlaces() {
+        return enlaces;
+    }
+
 
     private void registrarClases(
             List<ProgramaAst> programas
@@ -106,9 +109,6 @@ public final class AnalizadorSemanticoZ {
         }
     }
 
-    // =========================================================
-    // SEGUNDA PASADA: MIEMBROS Y SOBRECARGA
-    // =========================================================
 
     private void registrarMiembros() {
 
@@ -294,9 +294,6 @@ public final class AnalizadorSemanticoZ {
         }
     }
 
-    // =========================================================
-    // ANALISIS DE CLASE
-    // =========================================================
 
     private void analizarClase(
             ClaseInfo info
@@ -439,9 +436,6 @@ public final class AnalizadorSemanticoZ {
         }
     }
 
-    // =========================================================
-    // CONSTRUCTORES
-    // =========================================================
 
     private void analizarConstructor(
             ZAst.Constructor constructor
@@ -483,9 +477,6 @@ public final class AnalizadorSemanticoZ {
         tabla.salir();
     }
 
-    // =========================================================
-    // METODOS
-    // =========================================================
 
     private void analizarMetodo(
             ZAst.Metodo metodo
@@ -577,9 +568,6 @@ public final class AnalizadorSemanticoZ {
         }
     }
 
-    // =========================================================
-    // BLOQUES Y SENTENCIAS
-    // =========================================================
 
     private void analizarBloque(
             ZAst.Bloque bloque,
@@ -694,9 +682,6 @@ public final class AnalizadorSemanticoZ {
         }
     }
 
-    // =========================================================
-    // DECLARACIONES
-    // =========================================================
 
     private void analizarDeclaracion(
             ZAst.Declaracion declaracion
@@ -748,9 +733,6 @@ public final class AnalizadorSemanticoZ {
                 );
     }
 
-    // =========================================================
-    // IF
-    // =========================================================
 
     private void analizarSi(
             ZAst.Si si
@@ -794,9 +776,6 @@ public final class AnalizadorSemanticoZ {
         }
     }
 
-    // =========================================================
-    // SWITCH
-    // =========================================================
 
     private void analizarSwitch(
             ZAst.Seleccion seleccion
@@ -861,9 +840,6 @@ public final class AnalizadorSemanticoZ {
         profundidadSwitch--;
     }
 
-    // =========================================================
-    // FOR
-    // =========================================================
 
     private void analizarPara(
             ZAst.Para para
@@ -940,9 +916,6 @@ public final class AnalizadorSemanticoZ {
         tabla.salir();
     }
 
-    // =========================================================
-    // WHILE
-    // =========================================================
 
     private void analizarMientras(
             ZAst.Mientras mientras
@@ -975,9 +948,6 @@ public final class AnalizadorSemanticoZ {
         profundidadCiclo--;
     }
 
-    // =========================================================
-    // DO WHILE
-    // =========================================================
 
     private void analizarHacerMientras(
             ZAst.HacerMientras hacer
@@ -1010,9 +980,6 @@ public final class AnalizadorSemanticoZ {
         );
     }
 
-    // =========================================================
-    // RETURN
-    // =========================================================
 
     private void analizarRetorno(
             ZAst.Retorno retorno
@@ -1072,9 +1039,6 @@ public final class AnalizadorSemanticoZ {
         }
     }
 
-    // =========================================================
-    // INICIALIZADORES
-    // =========================================================
 
     private void validarInicializador(
             TipoZ esperado,
@@ -1173,11 +1137,24 @@ public final class AnalizadorSemanticoZ {
         }
     }
 
-    // =========================================================
-    // EXPRESIONES
-    // =========================================================
 
     private TipoZ resolverExpresion(
+            ZAst.Expresion expresion
+    ) {
+        TipoZ tipo =
+                resolverExpresionInterna(
+                        expresion
+                );
+
+        enlaces.registrarTipo(
+                expresion,
+                tipo.declarado()
+        );
+
+        return tipo;
+    }
+
+    private TipoZ resolverExpresionInterna(
             ZAst.Expresion expresion
     ) {
         if (expresion instanceof ZAst.Literal literal) {
@@ -1255,9 +1232,6 @@ public final class AnalizadorSemanticoZ {
         return TipoZ.desconocido();
     }
 
-    // =========================================================
-    // LITERALES
-    // =========================================================
 
     private TipoZ resolverLiteral(
             ZAst.Literal literal
@@ -1299,9 +1273,6 @@ public final class AnalizadorSemanticoZ {
         };
     }
 
-    // =========================================================
-    // IDENTIFICADORES
-    // =========================================================
 
     private TipoZ resolverIdentificador(
             ZAst.Identificador identificador
@@ -1343,9 +1314,6 @@ public final class AnalizadorSemanticoZ {
         );
     }
 
-    // =========================================================
-    // BINARIAS
-    // =========================================================
 
     private TipoZ resolverBinaria(
             ZAst.Binaria binaria
@@ -1521,9 +1489,6 @@ public final class AnalizadorSemanticoZ {
         );
     }
 
-    // =========================================================
-    // UNARIAS
-    // =========================================================
 
     private TipoZ resolverUnaria(
             ZAst.Unaria unaria
@@ -1571,9 +1536,6 @@ public final class AnalizadorSemanticoZ {
         return tipo;
     }
 
-    // =========================================================
-    // ASIGNACIONES
-    // =========================================================
 
     private TipoZ resolverAsignacion(
             ZAst.AsignacionExpresion asignacion
@@ -1637,9 +1599,6 @@ public final class AnalizadorSemanticoZ {
         return destino;
     }
 
-    // =========================================================
-    // TERNARIA
-    // =========================================================
 
     private TipoZ resolverTernaria(
             ZAst.Ternaria ternaria
@@ -1685,9 +1644,6 @@ public final class AnalizadorSemanticoZ {
         return comun;
     }
 
-    // =========================================================
-    // LLAMADAS
-    // =========================================================
 
     private TipoZ resolverLlamada(
             ZAst.Llamada llamada
@@ -1717,7 +1673,8 @@ public final class AnalizadorSemanticoZ {
                     claseActual,
                     identificador.nombre(),
                     llamada.argumentos(),
-                    llamada.posicion()
+                    llamada.posicion(),
+                    llamada
             );
         }
 
@@ -1772,7 +1729,8 @@ public final class AnalizadorSemanticoZ {
                     clase,
                     acceso.miembro(),
                     llamada.argumentos(),
-                    llamada.posicion()
+                    llamada.posicion(),
+                    llamada
             );
         }
 
@@ -1833,7 +1791,8 @@ public final class AnalizadorSemanticoZ {
             ClaseInfo clase,
             String nombre,
             List<ZAst.Expresion> argumentos,
-            PosicionFuente posicion
+            PosicionFuente posicion,
+            ZAst.Llamada llamada
     ) {
         List<TipoZ> tiposArgumentos =
                 resolverArgumentos(
@@ -1878,6 +1837,16 @@ public final class AnalizadorSemanticoZ {
             return TipoZ.desconocido();
         }
 
+        enlaces.registrarLlamada(
+                llamada,
+                clase.ast.nombre()
+                        + "."
+                        + firma(
+                        seleccionado.nombre(),
+                        seleccionado.parametros()
+                )
+        );
+
         return seleccionado.retorno()
                 .map(this::resolverTipo)
                 .orElse(
@@ -1885,9 +1854,6 @@ public final class AnalizadorSemanticoZ {
                 );
     }
 
-    // =========================================================
-    // ACCESO A ARREGLOS
-    // =========================================================
 
     private TipoZ resolverAccesoArreglo(
             ZAst.AccesoArreglo acceso
@@ -1928,9 +1894,6 @@ public final class AnalizadorSemanticoZ {
         return objetivo.reducirArreglo();
     }
 
-    // =========================================================
-    // ACCESO A MIEMBROS
-    // =========================================================
 
     private TipoZ resolverAccesoMiembro(
             ZAst.AccesoMiembro acceso
@@ -2000,9 +1963,6 @@ public final class AnalizadorSemanticoZ {
         return TipoZ.desconocido();
     }
 
-    // =========================================================
-    // ++ / --
-    // =========================================================
 
     private TipoZ resolverCambioPostfijo(
             ZAst.CambioPostfijo cambio
@@ -2029,9 +1989,6 @@ public final class AnalizadorSemanticoZ {
         return tipo;
     }
 
-    // =========================================================
-    // NEW OBJETO
-    // =========================================================
 
     private TipoZ resolverNuevoObjeto(
             ZAst.NuevoObjeto nuevo
@@ -2080,6 +2037,16 @@ public final class AnalizadorSemanticoZ {
                             argumentos
                     )
             );
+        } else {
+            enlaces.registrarConstructor(
+                    nuevo,
+                    nuevo.tipo()
+                            + "."
+                            + firma(
+                            "<init>",
+                            constructor.parametros()
+                    )
+            );
         }
 
         return TipoZ.objeto(
@@ -2087,9 +2054,6 @@ public final class AnalizadorSemanticoZ {
         );
     }
 
-    // =========================================================
-    // NEW ARREGLO
-    // =========================================================
 
     private TipoZ resolverNuevoArreglo(
             ZAst.NuevoArreglo nuevo
@@ -2135,9 +2099,6 @@ public final class AnalizadorSemanticoZ {
         );
     }
 
-    // =========================================================
-    // SOBRECARGA
-    // =========================================================
 
     private ZAst.Metodo seleccionarMetodo(
             List<ZAst.Metodo> candidatos,
@@ -2317,9 +2278,6 @@ public final class AnalizadorSemanticoZ {
         return -1;
     }
 
-    // =========================================================
-    // TIPOS
-    // =========================================================
 
     private void validarTipo(
             ZAst.Tipo tipo
@@ -2481,9 +2439,6 @@ public final class AnalizadorSemanticoZ {
         };
     }
 
-    // =========================================================
-    // COMPATIBILIDAD
-    // =========================================================
 
     private boolean esCompatible(
             TipoZ esperado,
@@ -2596,9 +2551,6 @@ public final class AnalizadorSemanticoZ {
                 == ClaseTipo.CHAR;
     }
 
-    // =========================================================
-    // ASIGNABLES
-    // =========================================================
 
     private void exigirAsignable(
             ZAst.Expresion expresion,
@@ -2617,9 +2569,6 @@ public final class AnalizadorSemanticoZ {
         );
     }
 
-    // =========================================================
-    // BOOLEANOS
-    // =========================================================
 
     private void exigirBooleano(
             TipoZ tipo,
@@ -2636,9 +2585,6 @@ public final class AnalizadorSemanticoZ {
         }
     }
 
-    // =========================================================
-    // ARGUMENTOS
-    // =========================================================
 
     private List<TipoZ> resolverArgumentos(
             List<ZAst.Expresion> argumentos
@@ -2650,9 +2596,6 @@ public final class AnalizadorSemanticoZ {
                 .toList();
     }
 
-    // =========================================================
-    // SYSTEM.OUT
-    // =========================================================
 
     private boolean esSystemOut(
             ZAst.AccesoMiembro acceso
@@ -2683,9 +2626,6 @@ public final class AnalizadorSemanticoZ {
                 .equals("System");
     }
 
-    // =========================================================
-    // FIRMAS
-    // =========================================================
 
     private String firma(
             String nombre,
@@ -2742,9 +2682,6 @@ public final class AnalizadorSemanticoZ {
                 + ")";
     }
 
-    // =========================================================
-    // ERRORES
-    // =========================================================
 
     private void error(
             PosicionFuente posicion,
@@ -2762,9 +2699,6 @@ public final class AnalizadorSemanticoZ {
         );
     }
 
-    // =========================================================
-    // INFORMACION DE CLASE
-    // =========================================================
 
     private static final class ClaseInfo {
 
@@ -2795,9 +2729,6 @@ public final class AnalizadorSemanticoZ {
         }
     }
 
-    // =========================================================
-    // TIPO INTERNO
-    // =========================================================
 
     private enum ClaseTipo {
         INT,

@@ -269,7 +269,10 @@ public final class BajadorArreglosProyecto {
 
         inicializarDatos(
                 inicioDatos,
-                finDatos
+                finDatos,
+                valorInicialElemento(
+                        cuarteta.argumento1()
+                )
         );
     }
 
@@ -308,7 +311,8 @@ public final class BajadorArreglosProyecto {
 
     private void inicializarDatos(
             String inicio,
-            String fin
+            String fin,
+            String valorInicial
     ) {
         String cursor =
                 nuevoTemporal();
@@ -353,7 +357,7 @@ public final class BajadorArreglosProyecto {
         agregar(
                 OperadorCuarteta.ESCRIBIR_HEAP,
                 cursor,
-                "0",
+                valorInicial,
                 null
         );
 
@@ -404,7 +408,7 @@ public final class BajadorArreglosProyecto {
 
         if (destinoArreglo.isPresent()) {
 
-            Optional<String> direccion =
+            Optional<DireccionArreglo> direccion =
                     calcularDireccion(
                             destinoArreglo.orElseThrow()
                     );
@@ -413,7 +417,8 @@ public final class BajadorArreglosProyecto {
 
                 agregar(
                         OperadorCuarteta.ESCRIBIR_HEAP,
-                        direccion.orElseThrow(),
+                        direccion.orElseThrow()
+                                .direccion(),
                         valor,
                         null
                 );
@@ -483,7 +488,7 @@ public final class BajadorArreglosProyecto {
             return valor;
         }
 
-        Optional<String> direccion =
+        Optional<DireccionArreglo> direccion =
                 calcularDireccion(
                         acceso.orElseThrow()
                 );
@@ -495,17 +500,20 @@ public final class BajadorArreglosProyecto {
         String temporal =
                 nuevoTemporal();
 
+        DireccionArreglo accesoResuelto =
+                direccion.orElseThrow();
+
         agregar(
                 OperadorCuarteta.LEER_HEAP,
-                direccion.orElseThrow(),
-                null,
+                accesoResuelto.direccion(),
+                accesoResuelto.tipoElemento(),
                 temporal
         );
 
         return temporal;
     }
 
-    private Optional<String> calcularDireccion(
+    private Optional<DireccionArreglo> calcularDireccion(
             AccesoArreglo acceso
     ) {
         Optional<BaseArreglo> base =
@@ -624,7 +632,10 @@ public final class BajadorArreglosProyecto {
         );
 
         return Optional.of(
-                direccion
+                new DireccionArreglo(
+                        direccion,
+                        arreglo.tipoElemento()
+                )
         );
     }
 
@@ -727,6 +738,10 @@ public final class BajadorArreglosProyecto {
                                 dimensionesTipo(
                                         slot.orElseThrow()
                                                 .tipo()
+                                ),
+                                tipoElementoArreglo(
+                                        slot.orElseThrow()
+                                                .tipo()
                                 )
                         )
                 );
@@ -815,14 +830,19 @@ public final class BajadorArreglosProyecto {
                         + "+"
                         + campoHeap.orElseThrow()
                         .desplazamiento(),
-                null,
+                campoHeap.orElseThrow()
+                        .tipo(),
                 arregloRef
         );
 
         return Optional.of(
                 new BaseArreglo(
                         arregloRef,
-                        dimensiones
+                        dimensiones,
+                        tipoElementoArreglo(
+                                campoHeap.orElseThrow()
+                                        .tipo()
+                        )
                 )
         );
     }
@@ -887,14 +907,19 @@ public final class BajadorArreglosProyecto {
                         + "+"
                         + campo.orElseThrow()
                         .desplazamiento(),
-                null,
+                campo.orElseThrow()
+                        .tipo(),
                 arregloRef
         );
 
         return Optional.of(
                 new BaseArreglo(
                         arregloRef,
-                        dimensiones
+                        dimensiones,
+                        tipoElementoArreglo(
+                                campo.orElseThrow()
+                                        .tipo()
+                        )
                 )
         );
     }
@@ -939,9 +964,6 @@ public final class BajadorArreglosProyecto {
                 || NUMERO.matcher(
                 valor
         ).matches()
-                || TEMPORAL.matcher(
-                valor
-        ).matches()
                 || valor.equals("P")
                 || valor.equals("H")) {
 
@@ -963,6 +985,12 @@ public final class BajadorArreglosProyecto {
             }
         }
 
+        if (TEMPORAL.matcher(
+                valor
+        ).matches()) {
+            return valor;
+        }
+
         return valor;
     }
 
@@ -975,11 +1003,34 @@ public final class BajadorArreglosProyecto {
         agregar(
                 OperadorCuarteta.LEER_STACK,
                 slot.direccion(),
-                null,
+                slot.tipo(),
                 temporal
         );
 
         return temporal;
+    }
+
+    private String tipoElementoArreglo(
+            String tipo
+    ) {
+        if (tipo == null
+                || tipo.isBlank()) {
+
+            return null;
+        }
+
+        String resultado =
+                tipo.trim();
+
+        while (resultado.endsWith("[]")) {
+            resultado =
+                    resultado.substring(
+                            0,
+                            resultado.length() - 2
+                    );
+        }
+
+        return resultado;
     }
 
     private int dimensionesTipo(
@@ -1121,6 +1172,37 @@ public final class BajadorArreglosProyecto {
         );
     }
 
+    private String valorInicialElemento(
+            String tipo
+    ) {
+        if (tipo == null
+                || tipo.isBlank()) {
+
+            return "0";
+        }
+
+        String normalizado =
+                tipo.trim();
+
+        return switch (normalizado) {
+            case "entero",
+                 "flotante",
+                 "caracter",
+                 "bool",
+                 "int",
+                 "double",
+                 "char",
+                 "boolean",
+                 "numerus",
+                 "decimalis",
+                 "littera" ->
+                    "0";
+
+            default ->
+                    "-1";
+        };
+    }
+
     private String extraerClaseZ(
             String funcion
     ) {
@@ -1209,9 +1291,16 @@ public final class BajadorArreglosProyecto {
         }
     }
 
+    private record DireccionArreglo(
+            String direccion,
+            String tipoElemento
+    ) {
+    }
+
     private record BaseArreglo(
             String referencia,
-            int dimensiones
+            int dimensiones,
+            String tipoElemento
     ) {
     }
 }

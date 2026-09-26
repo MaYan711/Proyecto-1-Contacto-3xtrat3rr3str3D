@@ -3,6 +3,8 @@ package com.compi2.contacto.ir;
 import com.compi2.contacto.ast.NodoAst;
 import com.compi2.contacto.ast.ProgramaAst;
 import com.compi2.contacto.ast.zetariano.ZAst;
+import com.compi2.contacto.semantica.AnalizadorSemanticoZ;
+import com.compi2.contacto.semantica.EnlacesZ;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -17,10 +19,12 @@ public final class GeneradorCuartetasZ {
     private final Deque<String> etiquetasRomper;
     private final Deque<String> etiquetasContinuar;
     private String claseActual;
+    private EnlacesZ enlaces;
 
     public GeneradorCuartetasZ() {
         etiquetasRomper = new ArrayDeque<>();
         etiquetasContinuar = new ArrayDeque<>();
+        enlaces = new EnlacesZ();
     }
 
     public ProgramaIntermedio generar(
@@ -30,6 +34,34 @@ public final class GeneradorCuartetasZ {
                 programas,
                 "Los programas son obligatorios"
         );
+
+        AnalizadorSemanticoZ analizador =
+                new AnalizadorSemanticoZ();
+
+        analizador.analizar(
+                programas
+        );
+
+        return generar(
+                programas,
+                analizador.enlaces()
+        );
+    }
+
+    public ProgramaIntermedio generar(
+            List<ProgramaAst> programas,
+            EnlacesZ enlaces
+    ) {
+        Objects.requireNonNull(
+                programas,
+                "Los programas son obligatorios"
+        );
+
+        this.enlaces =
+                Objects.requireNonNull(
+                        enlaces,
+                        "Los enlaces Z son obligatorios"
+                );
 
         programa = new ProgramaIntermedio();
         etiquetasRomper.clear();
@@ -330,7 +362,8 @@ public final class GeneradorCuartetasZ {
                     serializarLista(
                             lista
                     ),
-                    null,
+                    declaracion.tipo()
+                            .nombreCompleto(),
                     declaracion.nombre()
             );
 
@@ -850,6 +883,22 @@ public final class GeneradorCuartetasZ {
                         binaria.derecha()
                 );
 
+        if (binaria.operador()
+                == ZAst.OperadorBinario.DIVISION
+                && esTipoInt(
+                enlaces.buscarTipo(
+                        binaria
+                ).orElse(
+                        ""
+                )
+        )) {
+
+            return generarDivisionEntera(
+                    izquierda,
+                    derecha
+            );
+        }
+
         String temporal =
                 programa.nuevoTemporal();
 
@@ -970,17 +1019,37 @@ public final class GeneradorCuartetasZ {
                         asignacion.destino()
                 );
 
-        String temporal =
-                programa.nuevoTemporal();
+        String temporal;
 
-        agregar(
-                operadorAsignacionCompuesta(
-                        asignacion.operador()
-                ),
-                actual,
-                valor,
-                temporal
-        );
+        if (asignacion.operador()
+                == ZAst.OperadorAsignacion.DIVIDIR_ASIGNAR
+                && esTipoInt(
+                enlaces.buscarTipo(
+                        asignacion.destino()
+                ).orElse(
+                        ""
+                )
+        )) {
+
+            temporal =
+                    generarDivisionEntera(
+                            actual,
+                            valor
+                    );
+
+        } else {
+            temporal =
+                    programa.nuevoTemporal();
+
+            agregar(
+                    operadorAsignacionCompuesta(
+                            asignacion.operador()
+                    ),
+                    actual,
+                    valor,
+                    temporal
+            );
+        }
 
         agregar(
                 OperadorCuarteta.ASIGNAR,
@@ -1074,16 +1143,37 @@ public final class GeneradorCuartetasZ {
             for (ZAst.Expresion argumento
                     : llamada.argumentos()) {
 
+                String modo =
+                        objetivo.endsWith(
+                                "println"
+                        )
+                                ? "println"
+                                : "print";
+
+                String tipo =
+                        enlaces.buscarTipo(
+                                argumento
+                        ).orElse(
+                                ""
+                        );
+
+                if (esTipoChar(
+                        tipo
+                )) {
+                    modo += ":char";
+
+                } else if (esTipoBoolean(
+                        tipo
+                )) {
+                    modo += ":boolean";
+                }
+
                 agregar(
                         OperadorCuarteta.IMPRIMIR,
                         generarExpresion(
                                 argumento
                         ),
-                        objetivo.endsWith(
-                                "println"
-                        )
-                                ? "println"
-                                : "print",
+                        modo,
                         null
                 );
             }
@@ -1097,7 +1187,7 @@ public final class GeneradorCuartetasZ {
 
             agregar(
                     OperadorCuarteta.LEER,
-                    null,
+                    "String",
                     null,
                     temporal
             );
@@ -1126,12 +1216,18 @@ public final class GeneradorCuartetasZ {
             );
         }
 
+        String destino =
+                objetivoResueltoLlamada(
+                        llamada,
+                        objetivo
+                );
+
         String temporal =
                 programa.nuevoTemporal();
 
         agregar(
                 OperadorCuarteta.LLAMAR,
-                objetivo,
+                destino,
                 String.valueOf(
                         llamada.argumentos()
                                 .size()
@@ -1169,9 +1265,16 @@ public final class GeneradorCuartetasZ {
         String temporal =
                 programa.nuevoTemporal();
 
+        String constructor =
+                enlaces.buscarConstructor(
+                        nuevo
+                ).orElse(
+                        nuevo.tipo()
+                );
+
         agregar(
                 OperadorCuarteta.NUEVO_OBJETO,
-                nuevo.tipo(),
+                constructor,
                 String.valueOf(
                         nuevo.argumentos()
                                 .size()
@@ -1336,6 +1439,47 @@ public final class GeneradorCuartetasZ {
         return temporal;
     }
 
+    private String objetivoResueltoLlamada(
+            ZAst.Llamada llamada,
+            String objetivo
+    ) {
+        return enlaces.buscarLlamada(
+                llamada
+        ).map(
+                destino -> {
+                    int punto =
+                            destino.indexOf('.');
+
+                    String firma =
+                            punto >= 0
+                                    ? destino.substring(
+                                    punto + 1
+                            )
+                                    : destino;
+
+                    if (llamada.objetivo()
+                            instanceof ZAst.Identificador) {
+
+                        return firma;
+                    }
+
+                    if (llamada.objetivo()
+                            instanceof ZAst.AccesoMiembro acceso) {
+
+                        return generarBaseAcceso(
+                                acceso.objetivo()
+                        )
+                                + "."
+                                + firma;
+                    }
+
+                    return objetivo;
+                }
+        ).orElse(
+                objetivo
+        );
+    }
+
     private String generarObjetivoLlamada(
             ZAst.Expresion objetivo
     ) {
@@ -1387,6 +1531,67 @@ public final class GeneradorCuartetasZ {
                 valores
         )
                 + "}";
+    }
+
+    private String generarDivisionEntera(
+            String izquierda,
+            String derecha
+    ) {
+        String resto =
+                programa.nuevoTemporal();
+
+        agregar(
+                OperadorCuarteta.MODULO,
+                izquierda,
+                derecha,
+                resto
+        );
+
+        String ajustado =
+                programa.nuevoTemporal();
+
+        agregar(
+                OperadorCuarteta.RESTAR,
+                izquierda,
+                resto,
+                ajustado
+        );
+
+        String cociente =
+                programa.nuevoTemporal();
+
+        agregar(
+                OperadorCuarteta.DIVIDIR,
+                ajustado,
+                derecha,
+                cociente
+        );
+
+        return cociente;
+    }
+
+    private boolean esTipoInt(
+            String tipo
+    ) {
+        return "int".equals(
+                tipo
+        );
+    }
+
+    private boolean esTipoChar(
+            String tipo
+    ) {
+        return "char".equals(
+                tipo
+        );
+    }
+
+    private boolean esTipoBoolean(
+            String tipo
+    ) {
+        return "boolean".equals(
+                tipo
+        );
     }
 
     private OperadorCuarteta operadorBinario(

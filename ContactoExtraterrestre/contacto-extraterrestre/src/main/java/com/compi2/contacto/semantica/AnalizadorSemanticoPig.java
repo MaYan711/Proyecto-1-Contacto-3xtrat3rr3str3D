@@ -411,14 +411,24 @@ public final class AnalizadorSemanticoPig {
     private void analizarEntrada(
             PAst.Entrada entrada
     ) {
+        if (entrada.destino()
+                .isEmpty()) {
+
+            return;
+        }
+
+        PAst.Expresion destino =
+                entrada.destino()
+                        .orElseThrow();
+
         exigirAsignable(
-                entrada.destino(),
+                destino,
                 entrada.posicion()
         );
 
         TipoPig tipo =
                 resolverExpresion(
-                        entrada.destino()
+                        destino
                 );
 
         if (tipo.esArreglo()
@@ -434,6 +444,15 @@ public final class AnalizadorSemanticoPig {
                         "La entrada << requiere una variable de tipo primitivo"
                 );
             }
+
+            return;
+        }
+
+        if (!tipo.esDesconocido()) {
+            enlaces.registrarTipoEntrada(
+                    entrada,
+                    tipo.nombreBase()
+            );
         }
     }
 

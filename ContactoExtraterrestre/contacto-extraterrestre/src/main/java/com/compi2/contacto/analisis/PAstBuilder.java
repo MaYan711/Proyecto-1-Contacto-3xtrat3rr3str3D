@@ -332,10 +332,17 @@ public final class PAstBuilder {
     private PAst.Entrada construirEntrada(
             PigLatinParser.SentenciaEntradaContext contexto
     ) {
+        Optional<PAst.Expresion> destino =
+                contexto.accesoAsignable() == null
+                        ? Optional.empty()
+                        : Optional.of(
+                        construirAccesoAsignable(
+                                contexto.accesoAsignable()
+                        )
+                );
+
         return new PAst.Entrada(
-                construirAccesoAsignable(
-                        contexto.accesoAsignable()
-                ),
+                destino,
                 posicion(contexto.getStart())
         );
     }

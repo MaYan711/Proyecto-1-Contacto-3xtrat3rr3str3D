@@ -117,7 +117,7 @@ public final class PAst {
     }
 
     public record Entrada(
-            Expresion destino,
+            Optional<Expresion> destino,
             PosicionFuente posicion
     ) implements Sentencia {
 

@@ -172,8 +172,37 @@ public final class BajadorLlamadasProyecto {
                 );
 
         boolean llamadaInternaZ = false;
+        ReceptorMetodoZ receptorExplicito = null;
 
         if (marcoDestino.isEmpty()) {
+            Optional<ReceptorMetodoZ> receptor =
+                    resolverReceptorMetodoZ(
+                            destinoLlamada,
+                            cantidadExplicita
+                    );
+
+            if (receptor.isPresent()) {
+                ReceptorMetodoZ resuelto =
+                        receptor.orElseThrow();
+
+                Optional<MarcoStackProyecto> marcoResuelto =
+                        plan.marco(
+                                resuelto.funcion()
+                        );
+
+                if (marcoResuelto.isPresent()) {
+                    receptorExplicito = resuelto;
+                    destinoLlamada =
+                            resuelto.funcion();
+                    marcoDestino =
+                            marcoResuelto;
+                }
+            }
+        }
+
+        if (marcoDestino.isEmpty()
+                && receptorExplicito == null) {
+
             Optional<String> resuelto =
                     resolverMetodoInternoZ(
                             destinoLlamada,
@@ -206,10 +235,70 @@ public final class BajadorLlamadasProyecto {
             return;
         }
 
+        parametros =
+                materializarParametros(
+                        parametros
+                );
+
         int cantidadTotal =
                 cantidadExplicita;
 
-        if (llamadaInternaZ) {
+        if (receptorExplicito != null) {
+            String referenciaReceptor =
+                    materializarReceptor(
+                            receptorExplicito.receptor()
+                    );
+
+            if (referenciaReceptor == null) {
+                copiarParametrosSimbolicos(
+                        parametros
+                );
+
+                copiar(cuarteta);
+
+                return;
+            }
+
+            List<ParametroPendiente> completos =
+                    new ArrayList<>();
+
+            completos.add(
+                    new ParametroPendiente(
+                            referenciaReceptor,
+                            "0"
+                    )
+            );
+
+            for (int indice = 0;
+                 indice < parametros.size();
+                 indice++) {
+
+                ParametroPendiente parametro =
+                        parametros.get(indice);
+
+                int indiceOriginal =
+                        entero(
+                                parametro.indice(),
+                                indice
+                        );
+
+                completos.add(
+                        new ParametroPendiente(
+                                parametro.valor(),
+                                String.valueOf(
+                                        indiceOriginal + 1
+                                )
+                        )
+                );
+            }
+
+            parametros =
+                    completos;
+
+            cantidadTotal =
+                    cantidadExplicita + 1;
+
+        } else if (llamadaInternaZ) {
             Optional<SlotStackProyecto> thisSlot =
                     marcoActual.thisSlot();
 
@@ -318,11 +407,11 @@ public final class BajadorLlamadasProyecto {
                 null
         );
 
-        MarcoStackProyecto destino =
+        MarcoStackProyecto destinoMarco =
                 marcoDestino.orElseThrow();
 
         boolean retornaValor =
-                destino.retorno()
+                destinoMarco.retorno()
                         .map(
                                 slot ->
                                         !slot.tipo()
@@ -350,6 +439,179 @@ public final class BajadorLlamadasProyecto {
         );
     }
 
+    private Optional<ReceptorMetodoZ> resolverReceptorMetodoZ(
+            String destino,
+            int cantidadExplicita
+    ) {
+        String receptor =
+                nombreReceptor(
+                        destino
+                );
+
+        if (receptor == null) {
+            return Optional.empty();
+        }
+
+        Optional<OrigenReceptorZ> origen =
+                resolverOrigenReceptorZ(
+                        receptor
+                );
+
+        if (origen.isEmpty()) {
+            return Optional.empty();
+        }
+
+        OrigenReceptorZ receptorResuelto =
+                origen.orElseThrow();
+
+        Optional<String> funcion =
+                resolverMetodoEnClaseZ(
+                        receptorResuelto.tipo(),
+                        destino,
+                        cantidadExplicita
+                );
+
+        if (funcion.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(
+                new ReceptorMetodoZ(
+                        funcion.orElseThrow(),
+                        receptorResuelto
+                )
+        );
+    }
+
+    private Optional<OrigenReceptorZ> resolverOrigenReceptorZ(
+            String receptor
+    ) {
+        if (marcoActual == null
+                || receptor == null
+                || receptor.isBlank()) {
+            return Optional.empty();
+        }
+
+        if (receptor.equals("this")) {
+            String clase =
+                    claseFuncionActual();
+
+            Optional<SlotStackProyecto> thisSlot =
+                    marcoActual.thisSlot();
+
+            if (clase == null
+                    || thisSlot.isEmpty()) {
+                return Optional.empty();
+            }
+
+            return Optional.of(
+                    new OrigenReceptorZ(
+                            receptor,
+                            clase,
+                            TipoOrigenReceptorZ.THIS,
+                            thisSlot.orElseThrow(),
+                            null
+                    )
+            );
+        }
+
+        Optional<SlotStackProyecto> slot =
+                marcoActual.buscar(
+                        receptor
+                );
+
+        if (slot.isPresent()) {
+            SlotStackProyecto encontrado =
+                    slot.orElseThrow();
+
+            String clase =
+                    claseZDesdeTipo(
+                            encontrado.tipo()
+                    );
+
+            if (clase != null) {
+                return Optional.of(
+                        new OrigenReceptorZ(
+                                receptor,
+                                clase,
+                                TipoOrigenReceptorZ.STACK,
+                                encontrado,
+                                null
+                        )
+                );
+            }
+        }
+
+        String claseActual =
+                claseFuncionActual();
+
+        if (claseActual == null) {
+            return Optional.empty();
+        }
+
+        Optional<LayoutHeapProyecto> layout =
+                plan.layout(
+                        "Z::" + claseActual
+                );
+
+        if (layout.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Optional<LayoutHeapProyecto.Campo> campo =
+                layout.orElseThrow()
+                        .buscarCampo(
+                                receptor
+                        );
+
+        if (campo.isEmpty()) {
+            return Optional.empty();
+        }
+
+        LayoutHeapProyecto.Campo encontrado =
+                campo.orElseThrow();
+
+        String claseCampo =
+                claseZDesdeTipo(
+                        encontrado.tipo()
+                );
+
+        if (claseCampo == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(
+                new OrigenReceptorZ(
+                        receptor,
+                        claseCampo,
+                        TipoOrigenReceptorZ.CAMPO,
+                        null,
+                        encontrado
+                )
+        );
+    }
+
+    private String materializarReceptor(
+            OrigenReceptorZ receptor
+    ) {
+        return switch (receptor.origen()) {
+            case STACK ->
+                    leerSlot(
+                            receptor.slot()
+                    );
+
+            case THIS ->
+                    leerSlot(
+                            receptor.slot()
+                    );
+
+            case CAMPO ->
+                    leerCampoThis(
+                            receptor.campo()
+                    );
+        };
+    }
+
     private Optional<String> resolverMetodoInternoZ(
             String destino,
             int cantidadExplicita
@@ -361,6 +623,27 @@ public final class BajadorLlamadasProyecto {
             return Optional.empty();
         }
 
+        return resolverMetodoEnClaseZ(
+                clase,
+                destino,
+                cantidadExplicita
+        );
+    }
+
+    private Optional<String> resolverMetodoEnClaseZ(
+            String clase,
+            String destino,
+            int cantidadExplicita
+    ) {
+        String claseZ =
+                claseZDesdeTipo(
+                        clase
+                );
+
+        if (claseZ == null) {
+            return Optional.empty();
+        }
+
         String metodo =
                 nombreMetodo(
                         destino
@@ -368,7 +651,6 @@ public final class BajadorLlamadasProyecto {
 
         if (metodo == null
                 || metodo.equals("<init>")) {
-
             return Optional.empty();
         }
 
@@ -381,7 +663,7 @@ public final class BajadorLlamadasProyecto {
                                 funcion ->
                                         funcion.nombre()
                                                 .startsWith(
-                                                        clase + "."
+                                                        claseZ + "."
                                                 )
                         )
                         .filter(
@@ -474,6 +756,56 @@ public final class BajadorLlamadasProyecto {
                 : null;
     }
 
+    private String claseZDesdeTipo(
+            String tipo
+    ) {
+        if (tipo == null
+                || tipo.isBlank()) {
+            return null;
+        }
+
+        String candidato =
+                tipo.trim();
+
+        if (plan.layout(
+                "Z::" + candidato
+        ).isPresent()) {
+            return candidato;
+        }
+
+        return null;
+    }
+
+    private String nombreReceptor(
+            String nombre
+    ) {
+        if (nombre == null
+                || nombre.isBlank()) {
+            return null;
+        }
+
+        int punto =
+                nombre.lastIndexOf('.');
+
+        if (punto <= 0) {
+            return null;
+        }
+
+        String receptor =
+                nombre.substring(
+                        0,
+                        punto
+                );
+
+        if (!esIdentificadorSimple(
+                receptor
+        )) {
+            return null;
+        }
+
+        return receptor;
+    }
+
     private String nombreMetodo(
             String nombre
     ) {
@@ -511,6 +843,198 @@ public final class BajadorLlamadasProyecto {
         return resultado;
     }
 
+    private List<ParametroPendiente> materializarParametros(
+            List<ParametroPendiente> parametros
+    ) {
+        List<ParametroPendiente> resultado =
+                new ArrayList<>();
+
+        for (ParametroPendiente parametro
+                : parametros) {
+
+            resultado.add(
+                    new ParametroPendiente(
+                            materializarValor(
+                                    parametro.valor()
+                            ),
+                            parametro.indice()
+                    )
+            );
+        }
+
+        return resultado;
+    }
+
+    private String materializarValor(
+            String valor
+    ) {
+        if (valor == null
+                || valor.isBlank()
+                || valor.equals("-")) {
+            return valor;
+        }
+
+        if (valor.equals("null")) {
+            return "-1";
+        }
+
+        if (!esIdentificadorSimple(
+                valor
+        )) {
+            return valor;
+        }
+
+        if (valor.equals("this")) {
+            if (marcoActual == null) {
+                return valor;
+            }
+
+            Optional<SlotStackProyecto> thisSlot =
+                    marcoActual.thisSlot();
+
+            return thisSlot
+                    .map(this::leerSlot)
+                    .orElse(valor);
+        }
+
+        if (marcoActual != null) {
+            Optional<SlotStackProyecto> slot =
+                    marcoActual.buscar(
+                            valor
+                    );
+
+            if (slot.isPresent()) {
+                return leerSlot(
+                        slot.orElseThrow()
+                );
+            }
+        }
+
+        String claseActual =
+                claseFuncionActual();
+
+        if (claseActual == null) {
+            return valor;
+        }
+
+        Optional<LayoutHeapProyecto> layout =
+                plan.layout(
+                        "Z::" + claseActual
+                );
+
+        if (layout.isEmpty()) {
+            return valor;
+        }
+
+        Optional<LayoutHeapProyecto.Campo> campo =
+                layout.orElseThrow()
+                        .buscarCampo(
+                                valor
+                        );
+
+        if (campo.isEmpty()) {
+            return valor;
+        }
+
+        String materializado =
+                leerCampoThis(
+                        campo.orElseThrow()
+                );
+
+        return materializado == null
+                ? valor
+                : materializado;
+    }
+
+    private String leerSlot(
+            SlotStackProyecto slot
+    ) {
+        if (slot == null) {
+            return null;
+        }
+
+        String temporal =
+                nuevoTemporal();
+
+        agregar(
+                OperadorCuarteta.LEER_STACK,
+                slot.direccion(),
+                null,
+                temporal
+        );
+
+        return temporal;
+    }
+
+    private String leerCampoThis(
+            LayoutHeapProyecto.Campo campo
+    ) {
+        if (campo == null
+                || marcoActual == null) {
+            return null;
+        }
+
+        Optional<SlotStackProyecto> thisSlot =
+                marcoActual.thisSlot();
+
+        if (thisSlot.isEmpty()) {
+            return null;
+        }
+
+        String referenciaThis =
+                nuevoTemporal();
+
+        agregar(
+                OperadorCuarteta.LEER_STACK,
+                thisSlot.orElseThrow()
+                        .direccion(),
+                null,
+                referenciaThis
+        );
+
+        String valorCampo =
+                nuevoTemporal();
+
+        agregar(
+                OperadorCuarteta.LEER_HEAP,
+                referenciaThis
+                        + "+"
+                        + campo.desplazamiento(),
+                null,
+                valorCampo
+        );
+
+        return valorCampo;
+    }
+
+    private boolean esIdentificadorSimple(
+            String valor
+    ) {
+        if (valor == null
+                || valor.isBlank()) {
+            return false;
+        }
+
+        if (!Character.isJavaIdentifierStart(
+                valor.charAt(0)
+        )) {
+            return false;
+        }
+
+        for (int indice = 1;
+             indice < valor.length();
+             indice++) {
+
+            if (!Character.isJavaIdentifierPart(
+                    valor.charAt(indice)
+            )) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private void bajarNuevoObjeto(
             Cuarteta cuarteta
     ) {
@@ -533,10 +1057,40 @@ public final class BajadorLlamadasProyecto {
                         constructor
                 );
 
+        if (clase == null
+                && !esVacio(constructor)
+                && plan.layout(
+                "Z::" + constructor
+        ).isPresent()) {
+
+            clase =
+                    constructor;
+        }
+
         Optional<MarcoStackProyecto> marcoConstructor =
                 plan.marco(
                         constructor
                 );
+
+        if (marcoConstructor.isEmpty()
+                && clase != null) {
+
+            Optional<String> constructorResuelto =
+                    resolverConstructorZ(
+                            clase,
+                            cantidad
+                    );
+
+            if (constructorResuelto.isPresent()) {
+                constructor =
+                        constructorResuelto.orElseThrow();
+
+                marcoConstructor =
+                        plan.marco(
+                                constructor
+                        );
+            }
+        }
 
         Optional<LayoutHeapProyecto> layout =
                 clase == null
@@ -552,7 +1106,9 @@ public final class BajadorLlamadasProyecto {
                     parametros
             );
 
-            copiar(cuarteta);
+            copiar(
+                    cuarteta
+            );
 
             return;
         }
@@ -571,10 +1127,17 @@ public final class BajadorLlamadasProyecto {
                     parametros
             );
 
-            copiar(cuarteta);
+            copiar(
+                    cuarteta
+            );
 
             return;
         }
+
+        parametros =
+                materializarParametros(
+                        parametros
+                );
 
         LayoutHeapProyecto layoutObjeto =
                 layout.orElseThrow();
@@ -610,6 +1173,21 @@ public final class BajadorLlamadasProyecto {
                 null,
                 "H"
         );
+
+        for (LayoutHeapProyecto.Campo campo
+                : layoutObjeto.campos()) {
+
+            agregar(
+                    OperadorCuarteta.ESCRIBIR_HEAP,
+                    referenciaObjeto
+                            + "+"
+                            + campo.desplazamiento(),
+                    valorInicialCampo(
+                            campo.tipo()
+                    ),
+                    null
+            );
+        }
 
         int tamanoLlamador =
                 marcoActual.tamano();
@@ -767,6 +1345,46 @@ public final class BajadorLlamadasProyecto {
             default ->
                     "-1";
         };
+    }
+
+    private Optional<String> resolverConstructorZ(
+            String clase,
+            int cantidadExplicita
+    ) {
+        if (clase == null
+                || clase.isBlank()) {
+
+            return Optional.empty();
+        }
+
+        int cantidadEsperada =
+                cantidadExplicita + 1;
+
+        List<FuncionDisponible> candidatos =
+                funcionesDisponibles.stream()
+                        .filter(
+                                funcion ->
+                                        funcion.nombre()
+                                                .startsWith(
+                                                        clase
+                                                                + ".<init>("
+                                                )
+                        )
+                        .filter(
+                                funcion ->
+                                        funcion.cantidadParametros()
+                                                == cantidadEsperada
+                        )
+                        .toList();
+
+        if (candidatos.size() == 1) {
+            return Optional.of(
+                    candidatos.get(0)
+                            .nombre()
+            );
+        }
+
+        return Optional.empty();
     }
 
     private String extraerClaseConstructor(
@@ -966,6 +1584,27 @@ public final class BajadorLlamadasProyecto {
                         resultado
                 )
         );
+    }
+
+    private enum TipoOrigenReceptorZ {
+        STACK,
+        CAMPO,
+        THIS
+    }
+
+    private record OrigenReceptorZ(
+            String nombre,
+            String tipo,
+            TipoOrigenReceptorZ origen,
+            SlotStackProyecto slot,
+            LayoutHeapProyecto.Campo campo
+    ) {
+    }
+
+    private record ReceptorMetodoZ(
+            String funcion,
+            OrigenReceptorZ receptor
+    ) {
     }
 
     private record ParametroPendiente(

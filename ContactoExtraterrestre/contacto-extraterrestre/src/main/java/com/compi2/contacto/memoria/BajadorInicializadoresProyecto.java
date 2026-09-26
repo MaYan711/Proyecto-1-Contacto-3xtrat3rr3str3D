@@ -12,10 +12,24 @@ import java.util.Optional;
 public final class BajadorInicializadoresProyecto {
 
     private ProgramaIntermedio destino;
+    private PlanMemoriaProyecto plan;
+    private MarcoStackProyecto marcoActual;
+    private String funcionActual;
+    private String claseZActual;
     private int siguienteTemporalHeap;
 
     public ProgramaIntermedio bajar(
             ProgramaIntermedio origen
+    ) {
+        return bajar(
+                origen,
+                null
+        );
+    }
+
+    public ProgramaIntermedio bajar(
+            ProgramaIntermedio origen,
+            PlanMemoriaProyecto plan
     ) {
         Objects.requireNonNull(
                 origen,
@@ -24,27 +38,84 @@ public final class BajadorInicializadoresProyecto {
 
         destino =
                 new ProgramaIntermedio();
+
+        this.plan = plan;
+        marcoActual = null;
+        funcionActual = null;
+        claseZActual = null;
         siguienteTemporalHeap = 0;
 
         for (Cuarteta cuarteta
                 : origen.cuartetas()) {
 
-            if (cuarteta.operador()
-                    == OperadorCuarteta.INICIALIZAR_COMPUESTO) {
-
-                bajarInicializador(
-                        cuarteta
-                );
-
-            } else {
-
-                copiar(
-                        cuarteta
-                );
-            }
+            procesar(
+                    cuarteta
+            );
         }
 
         return destino;
+    }
+
+    private void procesar(
+            Cuarteta cuarteta
+    ) {
+        switch (cuarteta.operador()) {
+
+            case INICIO_FUNCION ->
+                    iniciarFuncion(
+                            cuarteta
+                    );
+
+            case FIN_FUNCION ->
+                    finalizarFuncion(
+                            cuarteta
+                    );
+
+            case INICIALIZAR_COMPUESTO ->
+                    bajarInicializador(
+                            cuarteta
+                    );
+
+            default ->
+                    copiar(
+                            cuarteta
+                    );
+        }
+    }
+
+    private void iniciarFuncion(
+            Cuarteta cuarteta
+    ) {
+        funcionActual =
+                cuarteta.argumento1();
+
+        marcoActual =
+                plan == null
+                        ? null
+                        : plan.marco(
+                        funcionActual
+                ).orElse(null);
+
+        claseZActual =
+                extraerClaseZ(
+                        funcionActual
+                );
+
+        copiar(
+                cuarteta
+        );
+    }
+
+    private void finalizarFuncion(
+            Cuarteta cuarteta
+    ) {
+        copiar(
+                cuarteta
+        );
+
+        marcoActual = null;
+        funcionActual = null;
+        claseZActual = null;
     }
 
     private void bajarInicializador(
@@ -78,9 +149,58 @@ public final class BajadorInicializadoresProyecto {
             return;
         }
 
+        String tipo =
+                normalizarTipo(
+                        cuarteta.argumento2()
+                );
+
+        if (!esVacio(tipo)
+                && !esTipoArreglo(tipo)) {
+
+            Optional<LayoutHeapProyecto> layout =
+                    buscarLayoutEstructuraY(
+                            tipo
+                    );
+
+            if (layout.isPresent()) {
+
+                if (!estructuraCompatible(
+                        layout.orElseThrow(),
+                        raiz.orElseThrow()
+                )) {
+
+                    copiar(
+                            cuarteta
+                    );
+
+                    return;
+                }
+
+                emitirEstructura(
+                        layout.orElseThrow(),
+                        raiz.orElseThrow(),
+                        cuarteta.resultado()
+                );
+
+                return;
+            }
+        }
+
+        bajarArreglo(
+                cuarteta,
+                raiz.orElseThrow(),
+                tipo
+        );
+    }
+
+    private void bajarArreglo(
+            Cuarteta cuarteta,
+            Lista raiz,
+            String tipo
+    ) {
         Optional<List<Integer>> dimensiones =
                 calcularDimensiones(
-                        raiz.orElseThrow()
+                        raiz
                 );
 
         if (dimensiones.isEmpty()) {
@@ -92,23 +212,170 @@ public final class BajadorInicializadoresProyecto {
             return;
         }
 
+        if (!esVacio(tipo)
+                && esTipoArreglo(tipo)) {
+
+            int cantidadDimensionesTipo =
+                    cantidadDimensionesTipo(
+                            tipo
+                    );
+
+            if (cantidadDimensionesTipo
+                    != dimensiones.orElseThrow()
+                    .size()) {
+
+                copiar(
+                        cuarteta
+                );
+
+                return;
+            }
+        }
+
+        emitirArreglo(
+                raiz,
+                cuarteta.resultado()
+        );
+    }
+
+    private String emitirEstructura(
+            LayoutHeapProyecto layout,
+            Lista lista,
+            String referenciaSolicitada
+    ) {
+        String referencia =
+                esVacio(
+                        referenciaSolicitada
+                )
+                        ? nuevoTemporal()
+                        : referenciaSolicitada;
+
+        agregar(
+                OperadorCuarteta.ASIGNAR,
+                "H",
+                null,
+                referencia
+        );
+
+        String siguienteHeap =
+                nuevoTemporal();
+
+        agregar(
+                OperadorCuarteta.SUMAR,
+                "H",
+                String.valueOf(
+                        Math.max(
+                                1,
+                                layout.tamano()
+                        )
+                ),
+                siguienteHeap
+        );
+
+        agregar(
+                OperadorCuarteta.ASIGNAR,
+                siguienteHeap,
+                null,
+                "H"
+        );
+
+        for (int indice = 0;
+             indice < layout.campos().size();
+             indice++) {
+
+            LayoutHeapProyecto.Campo campo =
+                    layout.campos()
+                            .get(indice);
+
+            Elemento elemento =
+                    lista.elementos()
+                            .get(indice);
+
+            String valor =
+                    materializarElementoCampo(
+                            campo,
+                            elemento
+                    );
+
+            agregar(
+                    OperadorCuarteta.ESCRIBIR_HEAP,
+                    referencia
+                            + "+"
+                            + campo.desplazamiento(),
+                    valor,
+                    null
+            );
+        }
+
+        return referencia;
+    }
+
+    private String materializarElementoCampo(
+            LayoutHeapProyecto.Campo campo,
+            Elemento elemento
+    ) {
+        if (elemento instanceof Valor valor) {
+            return materializarValor(
+                    valor.texto()
+            );
+        }
+
+        Lista lista =
+                (Lista) elemento;
+
+        if (esTipoArreglo(
+                campo.tipo()
+        )) {
+
+            return emitirArreglo(
+                    lista,
+                    null
+            );
+        }
+
+        Optional<LayoutHeapProyecto> layoutAnidado =
+                buscarLayoutEstructuraY(
+                        campo.tipo()
+                );
+
+        if (layoutAnidado.isPresent()) {
+            return emitirEstructura(
+                    layoutAnidado.orElseThrow(),
+                    lista,
+                    null
+            );
+        }
+
+        return "0";
+    }
+
+    private String emitirArreglo(
+            Lista raiz,
+            String referenciaSolicitada
+    ) {
+        List<Integer> dimensiones =
+                calcularDimensiones(
+                        raiz
+                ).orElseThrow();
+
         List<String> valores =
                 new ArrayList<>();
 
         aplanar(
-                raiz.orElseThrow(),
+                raiz,
                 valores
         );
 
         String referencia =
-                cuarteta.resultado();
-
-        List<Integer> dimensionesLista =
-                dimensiones.orElseThrow();
+                esVacio(
+                        referenciaSolicitada
+                )
+                        ? nuevoTemporal()
+                        : referenciaSolicitada;
 
         int inicioDatos =
                 1
-                        + dimensionesLista.size();
+                        + dimensiones.size();
 
         int totalCeldas =
                 inicioDatos
@@ -122,8 +389,7 @@ public final class BajadorInicializadoresProyecto {
         );
 
         String siguienteHeap =
-                "init_h"
-                        + siguienteTemporalHeap++;
+                nuevoTemporal();
 
         agregar(
                 OperadorCuarteta.SUMAR,
@@ -145,13 +411,13 @@ public final class BajadorInicializadoresProyecto {
                 OperadorCuarteta.ESCRIBIR_HEAP,
                 referencia + "+0",
                 String.valueOf(
-                        dimensionesLista.size()
+                        dimensiones.size()
                 ),
                 null
         );
 
         for (int indice = 0;
-             indice < dimensionesLista.size();
+             indice < dimensiones.size();
              indice++) {
 
             agregar(
@@ -162,7 +428,7 @@ public final class BajadorInicializadoresProyecto {
                             indice + 1
                     ),
                     String.valueOf(
-                            dimensionesLista.get(
+                            dimensiones.get(
                                     indice
                             )
                     ),
@@ -181,12 +447,263 @@ public final class BajadorInicializadoresProyecto {
                             + (
                             inicioDatos + indice
                     ),
-                    valores.get(
-                            indice
+                    materializarValor(
+                            valores.get(
+                                    indice
+                            )
                     ),
                     null
             );
         }
+
+        return referencia;
+    }
+
+    private boolean estructuraCompatible(
+            LayoutHeapProyecto layout,
+            Lista lista
+    ) {
+        if (layout.campos().size()
+                != lista.elementos().size()) {
+
+            return false;
+        }
+
+        for (int indice = 0;
+             indice < layout.campos().size();
+             indice++) {
+
+            LayoutHeapProyecto.Campo campo =
+                    layout.campos()
+                            .get(indice);
+
+            Elemento elemento =
+                    lista.elementos()
+                            .get(indice);
+
+            if (!(elemento instanceof Lista interna)) {
+                continue;
+            }
+
+            if (esTipoArreglo(
+                    campo.tipo()
+            )) {
+
+                Optional<List<Integer>> dimensiones =
+                        calcularDimensiones(
+                                interna
+                        );
+
+                if (dimensiones.isEmpty()
+                        || dimensiones.orElseThrow()
+                        .size()
+                        != cantidadDimensionesTipo(
+                        campo.tipo()
+                )) {
+
+                    return false;
+                }
+
+                String base =
+                        tipoBase(
+                                campo.tipo()
+                        );
+
+                if (buscarLayoutEstructuraY(
+                        base
+                ).isPresent()) {
+
+                    return false;
+                }
+
+                continue;
+            }
+
+            Optional<LayoutHeapProyecto> layoutAnidado =
+                    buscarLayoutEstructuraY(
+                            campo.tipo()
+                    );
+
+            if (layoutAnidado.isEmpty()
+                    || !estructuraCompatible(
+                    layoutAnidado.orElseThrow(),
+                    interna
+            )) {
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private Optional<LayoutHeapProyecto> buscarLayoutEstructuraY(
+            String tipo
+    ) {
+        if (plan == null
+                || esVacio(tipo)
+                || esTipoArreglo(tipo)) {
+
+            return Optional.empty();
+        }
+
+        String base =
+                tipoBase(
+                        tipo
+                );
+
+        if (funcionActual != null
+                && !funcionActual.equals("MAIOR")
+                && claseZActual == null) {
+
+            Optional<LayoutHeapProyecto> local =
+                    plan.layout(
+                            "Y::"
+                                    + funcionActual
+                                    + "::"
+                                    + base
+                    );
+
+            if (local.isPresent()
+                    && local.orElseThrow()
+                    .clase()
+                    == LayoutHeapProyecto.Clase.ESTRUCTURA_Y) {
+
+                return local;
+            }
+        }
+
+        Optional<LayoutHeapProyecto> global =
+                plan.layout(
+                        "Y::"
+                                + base
+                );
+
+        if (global.isPresent()
+                && global.orElseThrow()
+                .clase()
+                == LayoutHeapProyecto.Clase.ESTRUCTURA_Y) {
+
+            return global;
+        }
+
+        return Optional.empty();
+    }
+
+    private String materializarValor(
+            String valor
+    ) {
+        if (esVacio(valor)
+                || esLiteral(valor)
+                || marcoActual == null) {
+
+            return valor;
+        }
+
+        Optional<SlotStackProyecto> slot =
+                marcoActual.buscar(
+                        valor
+                );
+
+        if (slot.isPresent()) {
+            return leerStack(
+                    slot.orElseThrow()
+            );
+        }
+
+        Optional<String> campoActual =
+                leerCampoActualZ(
+                        valor
+                );
+
+        return campoActual.orElse(
+                valor
+        );
+    }
+
+    private Optional<String> leerCampoActualZ(
+            String nombre
+    ) {
+        if (plan == null
+                || marcoActual == null
+                || claseZActual == null
+                || esVacio(nombre)
+                || nombre.contains(".")
+                || nombre.contains("[")
+                || nombre.contains("(")) {
+
+            return Optional.empty();
+        }
+
+        Optional<LayoutHeapProyecto> layout =
+                plan.layout(
+                        "Z::"
+                                + claseZActual
+                );
+
+        if (layout.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Optional<LayoutHeapProyecto.Campo> campo =
+                layout.orElseThrow()
+                        .buscarCampo(
+                                nombre
+                        );
+
+        if (campo.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Optional<SlotStackProyecto> thisSlot =
+                marcoActual.thisSlot();
+
+        if (thisSlot.isEmpty()) {
+            return Optional.empty();
+        }
+
+        String referenciaThis =
+                leerStack(
+                        thisSlot.orElseThrow()
+                );
+
+        String resultado =
+                nuevoTemporal();
+
+        agregar(
+                OperadorCuarteta.LEER_HEAP,
+                referenciaThis
+                        + "+"
+                        + campo.orElseThrow()
+                        .desplazamiento(),
+                null,
+                resultado
+        );
+
+        return Optional.of(
+                resultado
+        );
+    }
+
+    private String leerStack(
+            SlotStackProyecto slot
+    ) {
+        String temporal =
+                nuevoTemporal();
+
+        agregar(
+                OperadorCuarteta.LEER_STACK,
+                slot.direccion(),
+                null,
+                temporal
+        );
+
+        return temporal;
+    }
+
+    private String nuevoTemporal() {
+        return "init_h"
+                + siguienteTemporalHeap++;
     }
 
     private Optional<List<Integer>> calcularDimensiones(
@@ -323,6 +840,145 @@ public final class BajadorInicializadoresProyecto {
                 );
             }
         }
+    }
+
+    private String normalizarTipo(
+            String tipo
+    ) {
+        if (tipo == null) {
+            return null;
+        }
+
+        String resultado =
+                tipo.trim();
+
+        return resultado.isEmpty()
+                || resultado.equals("-")
+                ? null
+                : resultado;
+    }
+
+    private boolean esTipoArreglo(
+            String tipo
+    ) {
+        return tipo != null
+                && tipo.endsWith("[]");
+    }
+
+    private int cantidadDimensionesTipo(
+            String tipo
+    ) {
+        int dimensiones = 0;
+        String actual = tipo;
+
+        while (actual != null
+                && actual.endsWith("[]")) {
+
+            dimensiones++;
+            actual =
+                    actual.substring(
+                            0,
+                            actual.length() - 2
+                    );
+        }
+
+        return dimensiones;
+    }
+
+    private String tipoBase(
+            String tipo
+    ) {
+        String resultado =
+                tipo == null
+                        ? ""
+                        : tipo.trim();
+
+        while (resultado.endsWith("[]")) {
+            resultado =
+                    resultado.substring(
+                            0,
+                            resultado.length() - 2
+                    );
+        }
+
+        return resultado;
+    }
+
+    private boolean esLiteral(
+            String valor
+    ) {
+        if (valor == null
+                || valor.isBlank()) {
+
+            return false;
+        }
+
+        String texto =
+                valor.trim();
+
+        if (texto.equals("true")
+                || texto.equals("false")
+                || texto.equals("verdadero")
+                || texto.equals("falso")
+                || texto.equals("verum")
+                || texto.equals("falsus")
+                || texto.equals("null")) {
+
+            return true;
+        }
+
+        if ((texto.startsWith("\"")
+                && texto.endsWith("\""))
+                || (texto.startsWith("'")
+                && texto.endsWith("'"))) {
+
+            return true;
+        }
+
+        try {
+            Double.parseDouble(
+                    texto
+            );
+            return true;
+
+        } catch (NumberFormatException excepcion) {
+            return false;
+        }
+    }
+
+    private String extraerClaseZ(
+            String funcion
+    ) {
+        if (funcion == null
+                || funcion.equals("MAIOR")
+                || !funcion.contains(".")) {
+
+            return null;
+        }
+
+        int punto =
+                funcion.indexOf('.');
+
+        if (punto <= 0) {
+            return null;
+        }
+
+        String clase =
+                funcion.substring(
+                        0,
+                        punto
+                );
+
+        if (plan == null
+                || plan.layout(
+                "Z::"
+                        + clase
+        ).isEmpty()) {
+
+            return null;
+        }
+
+        return clase;
     }
 
     private boolean esVacio(

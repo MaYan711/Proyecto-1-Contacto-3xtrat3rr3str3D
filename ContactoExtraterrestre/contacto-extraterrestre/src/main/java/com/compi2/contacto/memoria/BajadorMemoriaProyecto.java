@@ -127,8 +127,12 @@ public final class BajadorMemoriaProyecto {
                             cuarteta
                     );
 
-            case DECLARAR,
-                 DECLARAR_PARAMETRO,
+            case DECLARAR ->
+                    bajarDeclaracion(
+                            cuarteta
+                    );
+
+            case DECLARAR_PARAMETRO,
                  ETIQUETA,
                  SALTAR,
                  LEER_STACK,
@@ -174,6 +178,79 @@ public final class BajadorMemoriaProyecto {
         funcionActual = null;
         marcoActual = null;
         claseZActual = null;
+    }
+
+    private void bajarDeclaracion(
+            Cuarteta cuarteta
+    ) {
+        copiar(
+                cuarteta
+        );
+
+        if (marcoActual == null
+                || esVacio(
+                cuarteta.resultado()
+        )) {
+
+            return;
+        }
+
+        Optional<SlotStackProyecto> slot =
+                marcoActual.buscar(
+                        cuarteta.resultado()
+                );
+
+        if (slot.isEmpty()) {
+            return;
+        }
+
+        SlotStackProyecto destino =
+                slot.orElseThrow();
+
+        agregar(
+                OperadorCuarteta.ESCRIBIR_STACK,
+                destino.direccion(),
+                valorInicialTipo(
+                        destino.tipo()
+                ),
+                null
+        );
+    }
+
+    private String valorInicialTipo(
+            String tipo
+    ) {
+        if (tipo == null
+                || tipo.isBlank()) {
+
+            return "0";
+        }
+
+        String normalizado =
+                tipo.trim();
+
+        if (normalizado.endsWith("[]")) {
+            return "-1";
+        }
+
+        return switch (normalizado) {
+            case "entero",
+                 "flotante",
+                 "caracter",
+                 "bool",
+                 "int",
+                 "double",
+                 "char",
+                 "boolean",
+                 "numerus",
+                 "decimalis",
+                 "littera",
+                 "void" ->
+                    "0";
+
+            default ->
+                    "-1";
+        };
     }
 
     private void bajarAsignacion(
@@ -363,9 +440,6 @@ public final class BajadorMemoriaProyecto {
                 || esLiteral(
                 valor
         )
-                || esTemporal(
-                valor
-        )
                 || esDireccion(
                 valor
         )) {
@@ -391,7 +465,10 @@ public final class BajadorMemoriaProyecto {
 
         if (campoActual.isPresent()) {
             return leerHeap(
-                    campoActual.orElseThrow()
+                    campoActual.orElseThrow(),
+                    tipoCampoActual(
+                            valor
+                    ).orElse(null)
             );
         }
 
@@ -402,8 +479,17 @@ public final class BajadorMemoriaProyecto {
 
         if (miembro.isPresent()) {
             return leerHeap(
-                    miembro.orElseThrow()
+                    miembro.orElseThrow(),
+                    tipoMiembro(
+                            valor
+                    ).orElse(null)
             );
+        }
+
+        if (esTemporal(
+                valor
+        )) {
+            return valor;
         }
 
         return valor;
@@ -661,6 +747,49 @@ public final class BajadorMemoriaProyecto {
         );
     }
 
+    private Optional<String> tipoCampoActual(
+            String nombre
+    ) {
+        if (claseZActual == null
+                || nombre == null
+                || nombre.isBlank()
+                || nombre.contains(".")
+                || nombre.contains("[")) {
+
+            return Optional.empty();
+        }
+
+        Optional<LayoutHeapProyecto> layout =
+                plan.layout(
+                        "Z::"
+                                + claseZActual
+                );
+
+        if (layout.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return layout.orElseThrow()
+                .buscarCampo(
+                        nombre
+                )
+                .map(
+                        LayoutHeapProyecto.Campo::tipo
+                );
+    }
+
+    private Optional<String> tipoMiembro(
+            String expresion
+    ) {
+        return analizarMiembro(
+                expresion
+        ).map(
+                direccion ->
+                        direccion.campo()
+                                .tipo()
+        );
+    }
+
     private Optional<LayoutHeapProyecto> buscarLayoutTipo(
             String tipo
     ) {
@@ -712,7 +841,7 @@ public final class BajadorMemoriaProyecto {
         agregar(
                 OperadorCuarteta.LEER_STACK,
                 slot.direccion(),
-                null,
+                slot.tipo(),
                 temporal
         );
 
@@ -720,7 +849,8 @@ public final class BajadorMemoriaProyecto {
     }
 
     private String leerHeap(
-            String direccion
+            String direccion,
+            String tipo
     ) {
         String temporal =
                 nuevoTemporal();
@@ -728,7 +858,7 @@ public final class BajadorMemoriaProyecto {
         agregar(
                 OperadorCuarteta.LEER_HEAP,
                 direccion,
-                null,
+                tipo,
                 temporal
         );
 
