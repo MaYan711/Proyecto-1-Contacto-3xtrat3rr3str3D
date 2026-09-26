@@ -59,6 +59,16 @@ public final class CompiladorProyecto {
         List<Diagnostico> diagnosticosProyecto =
                 new ArrayList<>();
 
+        long cantidadPig =
+                proyecto.archivos()
+                        .stream()
+                        .filter(
+                                archivo ->
+                                        archivo.lenguaje()
+                                                == LenguajeFuente.PIG_LATIN
+                        )
+                        .count();
+
         if (proyecto.archivos()
                 .isEmpty()) {
 
@@ -73,9 +83,7 @@ public final class CompiladorProyecto {
                     )
             );
 
-        } else if (!proyecto.contieneLenguaje(
-                LenguajeFuente.PIG_LATIN
-        )) {
+        } else if (cantidadPig == 0) {
 
             diagnosticosProyecto.add(
                     new Diagnostico(
@@ -84,7 +92,21 @@ public final class CompiladorProyecto {
                             proyecto.raiz(),
                             1,
                             0,
-                            "El proyecto necesita al menos un archivo principal .pig"
+                            "El proyecto necesita exactamente un archivo principal .pig"
+                    )
+            );
+
+        } else if (cantidadPig > 1) {
+
+            diagnosticosProyecto.add(
+                    new Diagnostico(
+                            TipoDiagnostico.PROYECTO,
+                            Severidad.ERROR,
+                            proyecto.raiz(),
+                            1,
+                            0,
+                            "El proyecto debe contener exactamente un archivo principal .pig; se encontraron "
+                                    + cantidadPig
                     )
             );
         }
@@ -161,8 +183,15 @@ public final class CompiladorProyecto {
         ProgramaIntermedio programaMemoria =
                 new ProgramaIntermedio();
 
+        boolean analisisArchivosValido =
+                resultados.stream()
+                        .allMatch(
+                                ResultadoAnalisisArchivo::esValido
+                        );
+
         boolean proyectoValido =
-                diagnosticosProyecto.stream()
+                analisisArchivosValido
+                        && diagnosticosProyecto.stream()
                         .noneMatch(
                                 Diagnostico::esError
                         )
@@ -205,7 +234,8 @@ public final class CompiladorProyecto {
             programaMemoria =
                     new BajadorInicializadoresProyecto()
                             .bajar(
-                                    programaMemoria
+                                    programaMemoria,
+                                    planMemoria
                             );
 
             programaMemoria =

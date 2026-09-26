@@ -1,7 +1,5 @@
 package com.compi2.contacto.interfaz;
 
-import com.compi2.contacto.c3d.GeneradorCodigoC;
-import com.compi2.contacto.c3d.GeneradorCodigoTresDirecciones;
 import com.compi2.contacto.compilacion.CompiladorProyecto;
 import com.compi2.contacto.compilacion.ResultadoCompilacion;
 import com.compi2.contacto.editor.EditorCodigo;
@@ -9,6 +7,8 @@ import com.compi2.contacto.proyecto.ArchivoFuente;
 import com.compi2.contacto.proyecto.GestorProyecto;
 import com.compi2.contacto.proyecto.LenguajeFuente;
 import com.compi2.contacto.proyecto.ProyectoCompilacion;
+import com.compi2.contacto.c3d.GeneradorCodigoTresDirecciones;
+import com.compi2.contacto.c3d.GeneradorCodigoC;
 
 import javax.swing.BorderFactory;
 import javax.swing.JFileChooser;
@@ -42,9 +42,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 public final class VentanaPrincipal extends JFrame {
 
@@ -57,10 +60,9 @@ public final class VentanaPrincipal extends JFrame {
     private final PanelCuartetas panelCuartetas;
     private final PanelCuartetas panelMemoria;
     private final PanelCodigoC3D panelCodigoC3D;
-    private final PanelCodigoC panelCodigoC;
     private final JLabel estado;
-
     private Path raizProyecto;
+    private final PanelCodigoC panelCodigoC;
     private String codigoCActual;
 
     public VentanaPrincipal() {
@@ -90,12 +92,6 @@ public final class VentanaPrincipal extends JFrame {
         panelCodigoC3D =
                 new PanelCodigoC3D();
 
-        panelCodigoC =
-                new PanelCodigoC();
-
-        codigoCActual =
-                "";
-
         estado =
                 new JLabel(
                         "Abra una carpeta de proyecto para comenzar"
@@ -112,6 +108,12 @@ public final class VentanaPrincipal extends JFrame {
                                 raizInicial
                         )
                 );
+
+        panelCodigoC =
+                new PanelCodigoC();
+
+        codigoCActual =
+                "";
 
         configurarVentana();
         construirInterfaz();
@@ -350,6 +352,44 @@ public final class VentanaPrincipal extends JFrame {
                         guardarActivo()
         );
 
+        JMenuItem guardarTodosItem =
+                new JMenuItem(
+                        "Guardar todos"
+                );
+
+        guardarTodosItem.setAccelerator(
+                KeyStroke.getKeyStroke(
+                        KeyEvent.VK_S,
+                        InputEvent.CTRL_DOWN_MASK
+                                | InputEvent.SHIFT_DOWN_MASK
+                )
+        );
+
+        guardarTodosItem.addActionListener(
+                evento ->
+                        guardarTodos()
+        );
+
+        JMenuItem descargarArchivo =
+                new JMenuItem(
+                        "Descargar archivo seleccionado..."
+                );
+
+        descargarArchivo.addActionListener(
+                evento ->
+                        descargarArchivoSeleccionado()
+        );
+
+        JMenuItem descargarCarpeta =
+                new JMenuItem(
+                        "Descargar carpeta seleccionada..."
+                );
+
+        descargarCarpeta.addActionListener(
+                evento ->
+                        descargarCarpetaSeleccionada()
+        );
+
         JMenuItem salir =
                 new JMenuItem(
                         "Salir"
@@ -364,8 +404,24 @@ public final class VentanaPrincipal extends JFrame {
                 abrir
         );
 
+        archivo.addSeparator();
+
         archivo.add(
                 guardar
+        );
+
+        archivo.add(
+                guardarTodosItem
+        );
+
+        archivo.addSeparator();
+
+        archivo.add(
+                descargarArchivo
+        );
+
+        archivo.add(
+                descargarCarpeta
         );
 
         archivo.addSeparator();
@@ -384,6 +440,20 @@ public final class VentanaPrincipal extends JFrame {
                         "Analizar proyecto"
                 );
 
+        JMenuItem guardarC =
+                new JMenuItem(
+                        "Guardar codigo C..."
+                );
+
+        guardarC.addActionListener(
+                evento ->
+                        guardarCodigoC()
+        );
+
+        compilacion.add(
+                guardarC
+        );
+
         analizar.setAccelerator(
                 KeyStroke.getKeyStroke(
                         KeyEvent.VK_F6,
@@ -396,24 +466,8 @@ public final class VentanaPrincipal extends JFrame {
                         analizarProyecto()
         );
 
-        JMenuItem guardarC =
-                new JMenuItem(
-                        "Guardar codigo C..."
-                );
-
-        guardarC.addActionListener(
-                evento ->
-                        guardarCodigoC()
-        );
-
         compilacion.add(
                 analizar
-        );
-
-        compilacion.addSeparator();
-
-        compilacion.add(
-                guardarC
         );
 
         barra.add(
@@ -488,7 +542,20 @@ public final class VentanaPrincipal extends JFrame {
 
             pestanas.removeAll();
 
-            limpiarResultados();
+            modeloDiagnosticos.actualizar(
+                    List.of()
+            );
+
+            panelCuartetas.limpiar();
+
+            panelMemoria.limpiar();
+
+            panelCodigoC3D.limpiar();
+
+            panelCodigoC.limpiar();
+
+            codigoCActual =
+                    "";
 
             actualizarTitulosResultados();
 
@@ -522,7 +589,6 @@ public final class VentanaPrincipal extends JFrame {
         if (!Files.isDirectory(
                 ruta
         )) {
-
             return nodo;
         }
 
@@ -556,7 +622,6 @@ public final class VentanaPrincipal extends JFrame {
         }
 
         for (Path hijo : hijos) {
-
             nodo.add(
                     crearNodo(
                             hijo
@@ -616,7 +681,6 @@ public final class VentanaPrincipal extends JFrame {
         if (Files.isRegularFile(
                 ruta
         )) {
-
             abrirArchivo(
                     ruta
             );
@@ -780,6 +844,363 @@ public final class VentanaPrincipal extends JFrame {
         }
     }
 
+    private Path rutaSeleccionadaArbol() {
+        Object seleccionado =
+                arbolProyecto
+                        .getLastSelectedPathComponent();
+
+        if (!(seleccionado
+                instanceof DefaultMutableTreeNode nodo)) {
+
+            return null;
+        }
+
+        if (!(nodo.getUserObject()
+                instanceof Path ruta)) {
+
+            return null;
+        }
+
+        return ruta.toAbsolutePath()
+                .normalize();
+    }
+
+    private void descargarArchivoSeleccionado() {
+        Path origen =
+                rutaSeleccionadaArbol();
+
+        if (origen == null
+                || !Files.isRegularFile(
+                origen
+        )) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Seleccione un archivo en el arbol del proyecto",
+                    "Archivo no seleccionado",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            return;
+        }
+
+        JFileChooser selector =
+                new JFileChooser();
+
+        selector.setDialogTitle(
+                "Descargar archivo"
+        );
+
+        selector.setSelectedFile(
+                new java.io.File(
+                        origen.getFileName()
+                                .toString()
+                )
+        );
+
+        if (selector.showSaveDialog(
+                this
+        ) != JFileChooser.APPROVE_OPTION) {
+
+            return;
+        }
+
+        Path destino =
+                selector.getSelectedFile()
+                        .toPath()
+                        .toAbsolutePath()
+                        .normalize();
+
+        if (origen.equals(
+                destino
+        )) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "El destino debe ser diferente del archivo original",
+                    "Destino no valido",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            return;
+        }
+
+        if (!confirmarSobrescritura(
+                destino
+        )) {
+            return;
+        }
+
+        try {
+            Files.copy(
+                    origen,
+                    destino,
+                    StandardCopyOption.REPLACE_EXISTING
+            );
+
+            estado.setText(
+                    "Archivo descargado: "
+                            + destino
+            );
+
+        } catch (IOException excepcion) {
+
+            mostrarError(
+                    "No se pudo descargar el archivo",
+                    excepcion
+            );
+        }
+    }
+
+    private void descargarCarpetaSeleccionada() {
+        Path origen =
+                rutaSeleccionadaArbol();
+
+        if (origen == null
+                || !Files.isDirectory(
+                origen
+        )) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Seleccione una carpeta en el arbol del proyecto",
+                    "Carpeta no seleccionada",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            return;
+        }
+
+        JFileChooser selector =
+                new JFileChooser();
+
+        selector.setDialogTitle(
+                "Descargar carpeta"
+        );
+
+        selector.setSelectedFile(
+                new java.io.File(
+                        origen.getFileName()
+                                .toString()
+                                + ".zip"
+                )
+        );
+
+        if (selector.showSaveDialog(
+                this
+        ) != JFileChooser.APPROVE_OPTION) {
+
+            return;
+        }
+
+        Path destino =
+                selector.getSelectedFile()
+                        .toPath()
+                        .toAbsolutePath()
+                        .normalize();
+
+        if (!destino.getFileName()
+                .toString()
+                .toLowerCase()
+                .endsWith(
+                        ".zip"
+                )) {
+
+            destino =
+                    destino.resolveSibling(
+                            destino.getFileName()
+                                    .toString()
+                                    + ".zip"
+                    );
+        }
+
+        if (destino.startsWith(
+                origen
+        )) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Guarde el ZIP fuera de la carpeta que desea descargar",
+                    "Destino no valido",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            return;
+        }
+
+        if (!confirmarSobrescritura(
+                destino
+        )) {
+            return;
+        }
+
+        try {
+            crearZipCarpeta(
+                    origen,
+                    destino
+            );
+
+            estado.setText(
+                    "Carpeta descargada: "
+                            + destino
+            );
+
+        } catch (IOException excepcion) {
+
+            try {
+                Files.deleteIfExists(
+                        destino
+                );
+            } catch (IOException ignorada) {
+            }
+
+            mostrarError(
+                    "No se pudo descargar la carpeta",
+                    excepcion
+            );
+        }
+    }
+
+    private boolean confirmarSobrescritura(
+            Path destino
+    ) {
+        if (!Files.exists(
+                destino
+        )) {
+            return true;
+        }
+
+        int opcion =
+                JOptionPane.showConfirmDialog(
+                        this,
+                        "El archivo ya existe. Desea reemplazarlo?",
+                        "Confirmar reemplazo",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.WARNING_MESSAGE
+                );
+
+        return opcion
+                == JOptionPane.YES_OPTION;
+    }
+
+    private void crearZipCarpeta(
+            Path origen,
+            Path destino
+    ) throws IOException {
+
+        try (ZipOutputStream zip =
+                     new ZipOutputStream(
+                             Files.newOutputStream(
+                                     destino
+                             )
+                     );
+             var rutas =
+                     Files.walk(
+                             origen
+                     )) {
+
+            List<Path> elementos =
+                    rutas
+                            .filter(
+                                    ruta ->
+                                            !ruta.equals(
+                                                    origen
+                                            )
+                            )
+                            .filter(
+                                    ruta ->
+                                            incluirEnDescarga(
+                                                    origen,
+                                                    ruta
+                                            )
+                            )
+                            .sorted()
+                            .toList();
+
+            for (Path ruta : elementos) {
+                String nombre =
+                        origen.relativize(
+                                        ruta
+                                )
+                                .toString()
+                                .replace(
+                                        '\\',
+                                        '/'
+                                );
+
+                if (Files.isDirectory(
+                        ruta
+                )) {
+                    if (!nombre.endsWith(
+                            "/"
+                    )) {
+                        nombre +=
+                                "/";
+                    }
+
+                    zip.putNextEntry(
+                            new ZipEntry(
+                                    nombre
+                            )
+                    );
+
+                    zip.closeEntry();
+
+                    continue;
+                }
+
+                if (!Files.isRegularFile(
+                        ruta
+                )) {
+                    continue;
+                }
+
+                zip.putNextEntry(
+                        new ZipEntry(
+                                nombre
+                        )
+                );
+
+                Files.copy(
+                        ruta,
+                        zip
+                );
+
+                zip.closeEntry();
+            }
+        }
+    }
+
+    private boolean incluirEnDescarga(
+            Path origen,
+            Path ruta
+    ) {
+        Path relativa =
+                origen.relativize(
+                        ruta
+                );
+
+        for (Path parte : relativa) {
+            String nombre =
+                    parte.toString();
+
+            if (nombre.equals(
+                    "target"
+            )
+                    || nombre.equals(
+                    ".git"
+            )
+                    || nombre.equals(
+                    ".idea"
+            )) {
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private void analizarProyecto() {
         if (raizProyecto == null) {
 
@@ -796,7 +1217,17 @@ public final class VentanaPrincipal extends JFrame {
         try {
             guardarTodos();
 
-            limpiarResultados();
+            modeloDiagnosticos.actualizar(
+                    List.of()
+            );
+
+            panelCuartetas.limpiar();
+            panelMemoria.limpiar();
+            panelCodigoC3D.limpiar();
+            panelCodigoC.limpiar();
+
+            codigoCActual =
+                    "";
 
             actualizarTitulosResultados();
 
@@ -814,23 +1245,7 @@ public final class VentanaPrincipal extends JFrame {
                     resultado.diagnosticos()
             );
 
-            panelCuartetas.mostrar(
-                    resultado.programaIntermedio()
-            );
-
-            panelMemoria.mostrar(
-                    resultado.programaMemoria()
-            );
-
             if (!resultado.esValido()) {
-
-                codigoCActual =
-                        "";
-
-                panelCodigoC3D.limpiar();
-
-                panelCodigoC.limpiar();
-
                 actualizarTitulosResultados();
 
                 pestanasResultados.setSelectedIndex(
@@ -845,10 +1260,20 @@ public final class VentanaPrincipal extends JFrame {
                                 + " | Diagnosticos: "
                                 + resultado.diagnosticos()
                                 .size()
+                                + " | Cuartetas: 0"
+                                + " | Memoria: 0"
                 );
 
                 return;
             }
+
+            panelCuartetas.mostrar(
+                    resultado.programaIntermedio()
+            );
+
+            panelMemoria.mostrar(
+                    resultado.programaMemoria()
+            );
 
             String codigoC3D =
                     new GeneradorCodigoTresDirecciones()
@@ -860,41 +1285,15 @@ public final class VentanaPrincipal extends JFrame {
                     codigoC3D
             );
 
-            try {
-                codigoCActual =
-                        new GeneradorCodigoC()
-                                .generar(
-                                        resultado.programaMemoria()
-                                );
+            codigoCActual =
+                    new GeneradorCodigoC()
+                            .generar(
+                                    resultado.programaMemoria()
+                            );
 
-                panelCodigoC.mostrar(
-                        codigoCActual
-                );
-
-            } catch (RuntimeException excepcion) {
-
-                codigoCActual =
-                        "";
-
-                panelCodigoC.limpiar();
-
-                actualizarTitulosResultados();
-
-                pestanasResultados.setSelectedIndex(
-                        3
-                );
-
-                estado.setText(
-                        "Analisis correcto, pero fallo la generacion de codigo C"
-                );
-
-                mostrarError(
-                        "No se pudo generar el codigo C",
-                        excepcion
-                );
-
-                return;
-            }
+            panelCodigoC.mostrar(
+                    codigoCActual
+            );
 
             actualizarTitulosResultados();
 
@@ -918,9 +1317,15 @@ public final class VentanaPrincipal extends JFrame {
                             .getRowCount()
             );
 
-        } catch (IOException excepcion) {
+        } catch (IOException | RuntimeException excepcion) {
 
-            limpiarResultados();
+            panelCuartetas.limpiar();
+            panelMemoria.limpiar();
+            panelCodigoC3D.limpiar();
+            panelCodigoC.limpiar();
+
+            codigoCActual =
+                    "";
 
             actualizarTitulosResultados();
 
@@ -928,38 +1333,7 @@ public final class VentanaPrincipal extends JFrame {
                     "No se pudo analizar el proyecto",
                     excepcion
             );
-
-        } catch (RuntimeException excepcion) {
-
-            codigoCActual =
-                    "";
-
-            panelCodigoC.limpiar();
-
-            actualizarTitulosResultados();
-
-            mostrarError(
-                    "Ocurrio un error durante la compilacion",
-                    excepcion
-            );
         }
-    }
-
-    private void limpiarResultados() {
-        modeloDiagnosticos.actualizar(
-                List.of()
-        );
-
-        panelCuartetas.limpiar();
-
-        panelMemoria.limpiar();
-
-        panelCodigoC3D.limpiar();
-
-        panelCodigoC.limpiar();
-
-        codigoCActual =
-                "";
     }
 
     private void actualizarTitulosResultados() {
@@ -986,7 +1360,6 @@ public final class VentanaPrincipal extends JFrame {
                         .getRowCount()
                         + ")"
         );
-
         pestanasResultados.setTitleAt(
                 3,
                 "Codigo C3D"
@@ -996,89 +1369,6 @@ public final class VentanaPrincipal extends JFrame {
                 4,
                 "Codigo C"
         );
-    }
-
-    private void guardarCodigoC() {
-        if (raizProyecto == null) {
-
-            JOptionPane.showMessageDialog(
-                    this,
-                    "Primero debe abrir una carpeta de proyecto",
-                    "Proyecto no seleccionado",
-                    JOptionPane.INFORMATION_MESSAGE
-            );
-
-            return;
-        }
-
-        if (codigoCActual == null
-                || codigoCActual.isBlank()) {
-
-            analizarProyecto();
-
-            if (codigoCActual == null
-                    || codigoCActual.isBlank()) {
-
-                return;
-            }
-        }
-
-        JFileChooser selector =
-                new JFileChooser();
-
-        selector.setDialogTitle(
-                "Guardar codigo C"
-        );
-
-        selector.setSelectedFile(
-                new java.io.File(
-                        "programa.c"
-                )
-        );
-
-        if (selector.showSaveDialog(
-                this
-        ) != JFileChooser.APPROVE_OPTION) {
-
-            return;
-        }
-
-        Path destino =
-                selector.getSelectedFile()
-                        .toPath();
-
-        if (!destino.getFileName()
-                .toString()
-                .toLowerCase()
-                .endsWith(".c")) {
-
-            destino =
-                    destino.resolveSibling(
-                            destino.getFileName()
-                                    .toString()
-                                    + ".c"
-                    );
-        }
-
-        try {
-            Files.writeString(
-                    destino,
-                    codigoCActual,
-                    StandardCharsets.UTF_8
-            );
-
-            estado.setText(
-                    "Codigo C guardado: "
-                            + destino
-            );
-
-        } catch (IOException excepcion) {
-
-            mostrarError(
-                    "No se pudo guardar el codigo C",
-                    excepcion
-            );
-        }
     }
 
     private void intentarCerrar() {
@@ -1141,14 +1431,81 @@ public final class VentanaPrincipal extends JFrame {
                 this,
                 mensaje
                         + ": "
-                        + (
-                        excepcion.getMessage() == null
-                                ? excepcion.getClass()
-                                .getSimpleName()
-                                : excepcion.getMessage()
-                ),
+                        + excepcion.getMessage(),
                 "Error",
                 JOptionPane.ERROR_MESSAGE
         );
+    }
+
+    private void guardarCodigoC() {
+        if (codigoCActual == null
+                || codigoCActual.isBlank()) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Primero debe analizar correctamente el proyecto",
+                    "Codigo C no disponible",
+                    JOptionPane.INFORMATION_MESSAGE
+            );
+
+            return;
+        }
+
+        JFileChooser selector =
+                new JFileChooser();
+
+        selector.setDialogTitle(
+                "Guardar codigo C"
+        );
+
+        selector.setSelectedFile(
+                new java.io.File(
+                        "programa.c"
+                )
+        );
+
+        if (selector.showSaveDialog(
+                this
+        ) != JFileChooser.APPROVE_OPTION) {
+
+            return;
+        }
+
+        Path destino =
+                selector.getSelectedFile()
+                        .toPath();
+
+        if (!destino.getFileName()
+                .toString()
+                .toLowerCase()
+                .endsWith(".c")) {
+
+            destino =
+                    destino.resolveSibling(
+                            destino.getFileName()
+                                    .toString()
+                                    + ".c"
+                    );
+        }
+
+        try {
+            Files.writeString(
+                    destino,
+                    codigoCActual,
+                    StandardCharsets.UTF_8
+            );
+
+            estado.setText(
+                    "Codigo C guardado: "
+                            + destino
+            );
+
+        } catch (IOException excepcion) {
+
+            mostrarError(
+                    "No se pudo guardar el codigo C",
+                    excepcion
+            );
+        }
     }
 }

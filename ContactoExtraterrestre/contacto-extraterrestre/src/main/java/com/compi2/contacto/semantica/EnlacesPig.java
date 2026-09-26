@@ -11,10 +11,12 @@ public final class EnlacesPig {
 
     private final Map<PAst.Llamada, EnlaceLlamada> llamadas;
     private final Map<PAst.NuevoObjeto, EnlaceConstructor> constructores;
+    private final Map<PAst.Entrada, String> tiposEntrada;
 
     public EnlacesPig() {
         llamadas = new IdentityHashMap<>();
         constructores = new IdentityHashMap<>();
+        tiposEntrada = new IdentityHashMap<>();
     }
 
     public void registrarLlamada(
@@ -69,6 +71,29 @@ public final class EnlacesPig {
         return Optional.ofNullable(
                 constructores.get(
                         nuevo
+                )
+        );
+    }
+
+    public void registrarTipoEntrada(
+            PAst.Entrada entrada,
+            String tipo
+    ) {
+        Objects.requireNonNull(entrada);
+        Objects.requireNonNull(tipo);
+
+        tiposEntrada.put(
+                entrada,
+                tipo
+        );
+    }
+
+    public Optional<String> buscarTipoEntrada(
+            PAst.Entrada entrada
+    ) {
+        return Optional.ofNullable(
+                tiposEntrada.get(
+                        entrada
                 )
         );
     }

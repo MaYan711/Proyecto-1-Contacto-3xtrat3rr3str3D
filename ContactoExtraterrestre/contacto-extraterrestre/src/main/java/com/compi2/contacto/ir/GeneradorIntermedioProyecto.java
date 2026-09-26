@@ -1,20 +1,24 @@
 package com.compi2.contacto.ir;
 
 import com.compi2.contacto.ast.ProgramaAst;
+import com.compi2.contacto.semantica.EnlacesPig;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import com.compi2.contacto.semantica.EnlacesPig;
 
 public final class GeneradorIntermedioProyecto {
 
     private static final Pattern TEMPORAL =
-            Pattern.compile("\\bt(\\d+)\\b");
+            Pattern.compile(
+                    "\\$t(\\d+)"
+            );
 
     private static final Pattern ETIQUETA =
-            Pattern.compile("\\bL(\\d+)\\b");
+            Pattern.compile(
+                    "\\$L(\\d+)"
+            );
 
     public ProgramaIntermedio generar(
             List<ProgramaAst> programasY,
@@ -56,23 +60,32 @@ public final class GeneradorIntermedioProyecto {
         );
 
         ProgramaIntermedio y =
-                new GeneradorCuartetasY()
-                        .generar(
-                                programasY
-                        );
+                ProgramaIntermedio.conNombresProtegidos(
+                        () ->
+                                new GeneradorCuartetasY()
+                                        .generar(
+                                                programasY
+                                        )
+                );
 
         ProgramaIntermedio z =
-                new GeneradorCuartetasZ()
-                        .generar(
-                                programasZ
-                        );
+                ProgramaIntermedio.conNombresProtegidos(
+                        () ->
+                                new GeneradorCuartetasZ()
+                                        .generar(
+                                                programasZ
+                                        )
+                );
 
         ProgramaIntermedio pig =
-                new GeneradorCuartetasPig()
-                        .generar(
-                                programasPig,
-                                enlaces
-                        );
+                ProgramaIntermedio.conNombresProtegidos(
+                        () ->
+                                new GeneradorCuartetasPig()
+                                        .generar(
+                                                programasPig,
+                                                enlaces
+                                        )
+                );
 
         ProgramaIntermedio resultado =
                 new ProgramaIntermedio();
@@ -134,6 +147,100 @@ public final class GeneradorIntermedioProyecto {
             return null;
         }
 
+        StringBuilder resultado =
+                new StringBuilder();
+
+        StringBuilder segmento =
+                new StringBuilder();
+
+        boolean enCadena = false;
+        boolean enCaracter = false;
+        boolean escapado = false;
+
+        for (int indice = 0;
+             indice < valor.length();
+             indice++) {
+
+            char caracter =
+                    valor.charAt(
+                            indice
+                    );
+
+            if (enCadena || enCaracter) {
+                resultado.append(
+                        caracter
+                );
+
+                if (escapado) {
+                    escapado = false;
+                    continue;
+                }
+
+                if (caracter == '\\') {
+                    escapado = true;
+                    continue;
+                }
+
+                if (enCadena
+                        && caracter == '"') {
+                    enCadena = false;
+                    continue;
+                }
+
+                if (enCaracter
+                        && caracter == '\'') {
+                    enCaracter = false;
+                }
+
+                continue;
+            }
+
+            if (caracter == '"'
+                    || caracter == '\'') {
+
+                resultado.append(
+                        renombrarSegmento(
+                                segmento.toString(),
+                                prefijo
+                        )
+                );
+
+                segmento.setLength(
+                        0
+                );
+
+                resultado.append(
+                        caracter
+                );
+
+                enCadena =
+                        caracter == '"';
+
+                enCaracter =
+                        caracter == '\'';
+
+                continue;
+            }
+
+            segmento.append(
+                    caracter
+            );
+        }
+
+        resultado.append(
+                renombrarSegmento(
+                        segmento.toString(),
+                        prefijo
+                )
+        );
+
+        return resultado.toString();
+    }
+
+    private String renombrarSegmento(
+            String valor,
+            String prefijo
+    ) {
         String resultado =
                 reemplazar(
                         valor,

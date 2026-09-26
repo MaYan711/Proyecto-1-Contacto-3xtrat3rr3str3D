@@ -5,13 +5,39 @@ import com.compi2.contacto.ir.OperadorCuarteta;
 import com.compi2.contacto.ir.ProgramaIntermedio;
 
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 public final class BajadorCadenasProyecto {
+
+    private static final String MARCA_CADENA =
+            "@STR@";
 
     private ProgramaIntermedio destino;
     private int siguienteCadena;
     private int siguienteHeap;
+    private final Set<String> referenciasCadena;
+    private final Set<String> posicionesStackCadena;
+    private final Set<String> posicionesHeapCadena;
+    private final Map<String, String> retornosFunciones;
+    private boolean retornoCadenaPendiente;
+
+    public BajadorCadenasProyecto() {
+        referenciasCadena =
+                new LinkedHashSet<>();
+
+        posicionesStackCadena =
+                new LinkedHashSet<>();
+
+        posicionesHeapCadena =
+                new LinkedHashSet<>();
+
+        retornosFunciones =
+                new LinkedHashMap<>();
+    }
 
     public ProgramaIntermedio bajar(
             ProgramaIntermedio origen
@@ -26,6 +52,16 @@ public final class BajadorCadenasProyecto {
 
         siguienteCadena = 0;
         siguienteHeap = 0;
+        retornoCadenaPendiente = false;
+
+        referenciasCadena.clear();
+        posicionesStackCadena.clear();
+        posicionesHeapCadena.clear();
+        retornosFunciones.clear();
+
+        registrarRetornos(
+                origen
+        );
 
         for (Cuarteta cuarteta
                 : origen.cuartetas()) {
@@ -38,19 +74,72 @@ public final class BajadorCadenasProyecto {
         return destino;
     }
 
+    private void registrarRetornos(
+            ProgramaIntermedio programa
+    ) {
+        for (Cuarteta cuarteta
+                : programa.cuartetas()) {
+
+            if (cuarteta.operador()
+                    != OperadorCuarteta.INICIO_FUNCION) {
+
+                continue;
+            }
+
+            retornosFunciones.put(
+                    cuarteta.argumento1(),
+                    cuarteta.argumento2()
+            );
+        }
+    }
+
     private void procesar(
             Cuarteta cuarteta
     ) {
         switch (cuarteta.operador()) {
 
-            case ASIGNAR ->
-                    agregar(
-                            cuarteta.operador(),
-                            materializar(
-                                    cuarteta.argumento1()
-                            ),
-                            cuarteta.argumento2(),
+            case INICIO_FUNCION -> {
+                posicionesStackCadena.clear();
+                posicionesHeapCadena.clear();
+                retornoCadenaPendiente = false;
+                copiar(
+                        cuarteta
+                );
+            }
+
+            case FIN_FUNCION -> {
+                posicionesStackCadena.clear();
+                posicionesHeapCadena.clear();
+                retornoCadenaPendiente = false;
+                copiar(
+                        cuarteta
+                );
+            }
+
+            case DECLARAR,
+                 DECLARAR_PARAMETRO -> {
+                if (esTipoCadena(
+                        cuarteta.argumento1()
+                )) {
+
+                    registrarReferenciaCadena(
                             cuarteta.resultado()
+                    );
+                }
+
+                copiar(
+                        cuarteta
+                );
+            }
+
+            case ASIGNAR ->
+                    bajarAsignacion(
+                            cuarteta
+                    );
+
+            case SUMAR ->
+                    bajarSuma(
+                            cuarteta
                     );
 
             case PARAMETRO ->
@@ -73,25 +162,39 @@ public final class BajadorCadenasProyecto {
                             cuarteta.resultado()
                     );
 
-            case ESCRIBIR_STACK,
-                 ESCRIBIR_HEAP ->
-                    agregar(
-                            cuarteta.operador(),
-                            cuarteta.argumento1(),
-                            materializar(
-                                    cuarteta.argumento2()
-                            ),
-                            cuarteta.resultado()
+            case ESCRIBIR_STACK ->
+                    bajarEscrituraStack(
+                            cuarteta
+                    );
+
+            case LEER_STACK ->
+                    bajarLecturaStack(
+                            cuarteta
+                    );
+
+            case ESCRIBIR_HEAP ->
+                    bajarEscrituraHeap(
+                            cuarteta
+                    );
+
+            case LEER_HEAP ->
+                    bajarLecturaHeap(
+                            cuarteta
+                    );
+
+            case LLAMAR ->
+                    bajarLlamada(
+                            cuarteta
+                    );
+
+            case LEER ->
+                    bajarLectura(
+                            cuarteta
                     );
 
             case IMPRIMIR ->
-                    agregar(
-                            cuarteta.operador(),
-                            materializar(
-                                    cuarteta.argumento1()
-                            ),
-                            cuarteta.argumento2(),
-                            cuarteta.resultado()
+                    bajarImpresion(
+                            cuarteta
                     );
 
             default ->
@@ -99,6 +202,269 @@ public final class BajadorCadenasProyecto {
                             cuarteta
                     );
         }
+    }
+
+    private void bajarAsignacion(
+            Cuarteta cuarteta
+    ) {
+        String valor =
+                materializar(
+                        cuarteta.argumento1()
+                );
+
+        if (esReferenciaCadena(
+                valor
+        )) {
+
+            registrarReferenciaCadena(
+                    cuarteta.resultado()
+            );
+        }
+
+        agregar(
+                cuarteta.operador(),
+                valor,
+                cuarteta.argumento2(),
+                cuarteta.resultado()
+        );
+    }
+
+    private void bajarSuma(
+            Cuarteta cuarteta
+    ) {
+        String izquierda =
+                materializar(
+                        cuarteta.argumento1()
+                );
+
+        String derecha =
+                materializar(
+                        cuarteta.argumento2()
+                );
+
+        boolean izquierdaCadena =
+                esReferenciaCadena(
+                        izquierda
+                );
+
+        boolean derechaCadena =
+                esReferenciaCadena(
+                        derecha
+                );
+
+        if (!izquierdaCadena
+                && !derechaCadena) {
+
+            agregar(
+                    cuarteta.operador(),
+                    izquierda,
+                    derecha,
+                    cuarteta.resultado()
+            );
+
+            return;
+        }
+
+        String argumento1 =
+                izquierdaCadena
+                        ? marcarCadena(
+                        izquierda
+                )
+                        : izquierda;
+
+        String argumento2 =
+                derechaCadena
+                        ? marcarCadena(
+                        derecha
+                )
+                        : derecha;
+
+        registrarReferenciaCadena(
+                cuarteta.resultado()
+        );
+
+        agregar(
+                OperadorCuarteta.SUMAR,
+                argumento1,
+                argumento2,
+                cuarteta.resultado()
+        );
+    }
+
+    private void bajarEscrituraStack(
+            Cuarteta cuarteta
+    ) {
+        String valor =
+                materializar(
+                        cuarteta.argumento2()
+                );
+
+        if (esReferenciaCadena(
+                valor
+        )) {
+
+            posicionesStackCadena.add(
+                    normalizarDireccion(
+                            cuarteta.argumento1()
+                    )
+            );
+        }
+
+        agregar(
+                cuarteta.operador(),
+                cuarteta.argumento1(),
+                valor,
+                cuarteta.resultado()
+        );
+    }
+
+    private void bajarLecturaStack(
+            Cuarteta cuarteta
+    ) {
+        String direccion =
+                normalizarDireccion(
+                        cuarteta.argumento1()
+                );
+
+        if (esTipoCadena(
+                cuarteta.argumento2()
+        )
+                || posicionesStackCadena.contains(
+                direccion
+        )
+                || (
+                retornoCadenaPendiente
+                        && esDireccionRetorno(
+                        direccion
+                )
+        )) {
+
+            registrarReferenciaCadena(
+                    cuarteta.resultado()
+            );
+        }
+
+        if (retornoCadenaPendiente
+                && esDireccionRetorno(
+                direccion
+        )) {
+
+            retornoCadenaPendiente = false;
+        }
+
+        copiar(
+                cuarteta
+        );
+    }
+
+    private void bajarEscrituraHeap(
+            Cuarteta cuarteta
+    ) {
+        String valor =
+                materializar(
+                        cuarteta.argumento2()
+                );
+
+        if (esReferenciaCadena(
+                valor
+        )) {
+
+            posicionesHeapCadena.add(
+                    normalizarDireccion(
+                            cuarteta.argumento1()
+                    )
+            );
+        }
+
+        agregar(
+                cuarteta.operador(),
+                cuarteta.argumento1(),
+                valor,
+                cuarteta.resultado()
+        );
+    }
+
+    private void bajarLecturaHeap(
+            Cuarteta cuarteta
+    ) {
+        if (esTipoCadena(
+                cuarteta.argumento2()
+        )
+                || posicionesHeapCadena.contains(
+                normalizarDireccion(
+                        cuarteta.argumento1()
+                )
+        )) {
+
+            registrarReferenciaCadena(
+                    cuarteta.resultado()
+            );
+        }
+
+        copiar(
+                cuarteta
+        );
+    }
+
+    private void bajarLectura(
+            Cuarteta cuarteta
+    ) {
+        if (esTipoCadena(
+                cuarteta.argumento1()
+        )) {
+
+            registrarReferenciaCadena(
+                    cuarteta.resultado()
+            );
+        }
+
+        copiar(
+                cuarteta
+        );
+    }
+
+    private void bajarLlamada(
+            Cuarteta cuarteta
+    ) {
+        copiar(
+                cuarteta
+        );
+
+        String tipoRetorno =
+                retornosFunciones.get(
+                        cuarteta.argumento1()
+                );
+
+        retornoCadenaPendiente =
+                esTipoCadena(
+                        tipoRetorno
+                );
+    }
+
+    private void bajarImpresion(
+            Cuarteta cuarteta
+    ) {
+        String valor =
+                materializar(
+                        cuarteta.argumento1()
+                );
+
+        if (esReferenciaCadena(
+                valor
+        )) {
+
+            valor =
+                    marcarCadena(
+                            valor
+                    );
+        }
+
+        agregar(
+                cuarteta.operador(),
+                valor,
+                cuarteta.argumento2(),
+                cuarteta.resultado()
+        );
     }
 
     private String materializar(
@@ -123,6 +489,10 @@ public final class BajadorCadenasProyecto {
         String referencia =
                 "str_t"
                         + siguienteCadena++;
+
+        registrarReferenciaCadena(
+                referencia
+        );
 
         agregar(
                 OperadorCuarteta.ASIGNAR,
@@ -179,6 +549,110 @@ public final class BajadorCadenasProyecto {
         );
 
         return referencia;
+    }
+
+    private void registrarReferenciaCadena(
+            String valor
+    ) {
+        if (valor == null
+                || valor.isBlank()
+                || valor.equals("-")) {
+
+            return;
+        }
+
+        referenciasCadena.add(
+                valor
+        );
+    }
+
+    private boolean esReferenciaCadena(
+            String valor
+    ) {
+        if (valor == null
+                || valor.isBlank()
+                || valor.equals("-")) {
+
+            return false;
+        }
+
+        return esMarcadoCadena(
+                valor
+        )
+                || esLiteralCadena(
+                valor
+        )
+                || referenciasCadena.contains(
+                valor
+        );
+    }
+
+    private boolean esTipoCadena(
+            String tipo
+    ) {
+        if (tipo == null) {
+            return false;
+        }
+
+        String normalizado =
+                tipo.trim();
+
+        return normalizado.equalsIgnoreCase(
+                "String"
+        )
+                || normalizado.equalsIgnoreCase(
+                "cadena"
+        )
+                || normalizado.equalsIgnoreCase(
+                "textum"
+        );
+    }
+
+    private boolean esDireccionRetorno(
+            String direccion
+    ) {
+        return "P+0".equals(
+                direccion
+        )
+                || "P".equals(
+                direccion
+        );
+    }
+
+    private String normalizarDireccion(
+            String direccion
+    ) {
+        if (direccion == null) {
+            return "";
+        }
+
+        return direccion
+                .replace(
+                        " ",
+                        ""
+                );
+    }
+
+    private String marcarCadena(
+            String valor
+    ) {
+        if (esMarcadoCadena(
+                valor
+        )) {
+            return valor;
+        }
+
+        return MARCA_CADENA
+                + valor;
+    }
+
+    private boolean esMarcadoCadena(
+            String valor
+    ) {
+        return valor != null
+                && valor.startsWith(
+                MARCA_CADENA
+        );
     }
 
     private boolean esLiteralCadena(

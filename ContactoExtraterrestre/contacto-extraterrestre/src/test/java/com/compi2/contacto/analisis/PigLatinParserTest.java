@@ -148,7 +148,7 @@ class PigLatinParserTest {
 
                 MAIOR>
                 >> "Ingresa tu nombre";
-                << nombre;
+                nombre <<;
                 >> "Bienvenido" >> nombre;
                 FINIS;
                 """;

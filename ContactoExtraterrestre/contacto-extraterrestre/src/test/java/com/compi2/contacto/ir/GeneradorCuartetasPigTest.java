@@ -203,7 +203,7 @@ class GeneradorCuartetasPigTest {
                 esto nombre : textum "Inicial";
 
                 MAIOR>
-                << nombre;
+                nombre <<;
                 >> nombre;
                 FINIS;
                 """;
